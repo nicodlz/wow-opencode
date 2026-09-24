@@ -2,6 +2,14 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Browse and validate folders through the OpenCode server API, including Linux paths from a Windows bridge.
+- Resolve relative paths and `~` using the server's working directory and home, and match sessions using the server's path semantics.
+- Support `OPENCODE_SERVER_URL`, authenticated HTTP/SSE with default or custom usernames, and reverse-proxy URL prefixes; report authentication errors explicitly.
+- Add `setup.js --server` and preserve remote `--project` paths when installing on Windows.
+- Fix folder tooltips passing Lua `gsub`'s replacement count to `SetText`.
+
 ## 0.4.0 — WoW OpenCode
 
 - Replaced the Claude CLI runner with an OpenCode HTTP/SSE client.

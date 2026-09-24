@@ -7,6 +7,7 @@ Based on [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), li
 ## Features
 
 - **Folders**: folder browser with an editable path, parent-folder navigation, pagination, and recent folders.
+- Local or remote OpenCode servers, including Linux: folders are read through the server API, and `~` refers to the server account's home.
 - **Sessions**: find OpenCode sessions in the current folder and import their conversations.
 - **+ New session**: create a persistent session in the current folder.
 - Multiple projects and sessions running in parallel, with a separate draft for each conversation.
@@ -20,7 +21,7 @@ Based on [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), li
 ## Requirements
 
 - **Windows**, with WoW Forever running in **windowed or borderless mode**, visible on screen.
-- **Node.js 22.2+**, **Git**, and **OpenCode** installed on that PC.
+- **Node.js 22.2+** and **Git** on the game PC. **OpenCode** can run locally or on a remote Linux, macOS, or Windows server.
 - A connected provider and a working model in OpenCode. First check that you can have a conversation by running `opencode` in a terminal.
 - The upstream transport targets Forever **TOC 16001**, tested by its author on client **1.60.1.69913**.
 
@@ -36,7 +37,7 @@ cd wow-opencode
 npm ci
 ```
 
-If OpenCode is not installed yet:
+For a local server, install OpenCode if needed. If you already have a remote server, use the [remote server setup](docs/REMOTE-SERVER.md) instead.
 
 ```powershell
 npm install -g opencode-ai
@@ -85,7 +86,22 @@ Keep both terminals open while you play. `bridge\start-window.cmd` also opens th
 4. **Sessions** resumes an existing conversation in the folder; **+ New session** starts another one.
 5. Minimize the window with **Esc** or the button in the top-right corner. You will be notified when OpenCode replies or needs your input.
 
-Folders belong to the PC running the bridge and OpenCode. This version targets a local OpenCode server that uses the same paths as the bridge.
+Folders always belong to the **OpenCode server**. The bridge uses `/path` and `/file` to resolve and browse them. A Windows bridge connected to Linux keeps `/home/...` paths intact and resolves `~` to the Linux account's home. Addon files and screen capture remain on the Windows game PC.
+
+### Remote Linux server
+
+In the Windows PowerShell terminal where you start the bridge:
+
+```powershell
+$env:OPENCODE_SERVER_URL = "https://your-opencode-server.example"
+$env:OPENCODE_SERVER_PASSWORD = "YOUR_SERVER_PASSWORD"
+# Optional: only if the server uses a custom username; the default is opencode.
+$env:OPENCODE_SERVER_USERNAME = "opencode"
+$env:WOW_OPENCODE_PROJECT = "/home/your-user/project"
+npm start
+```
+
+The same credentials are used for HTTP requests and the SSE stream. You can also set `serverUrl` and `defaultCwd` in `bridge/config.json`; the environment variables above override them. Authentication values stay in the environment, not in addon files or configuration. See the [remote server guide](docs/REMOTE-SERVER.md) for setup, SSH tunneling, and migrating an existing installation.
 
 ## Useful commands
 
@@ -123,6 +139,7 @@ To preserve upstream transport compatibility, the addon's internal folders, Save
 ## Configuration and troubleshooting
 
 - [Detailed Windows installation guide](docs/INSTALL-WINDOWS.md)
+- [Remote Linux server and authentication](docs/REMOTE-SERVER.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Contributing and testing](CONTRIBUTING.md)

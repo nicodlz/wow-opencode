@@ -2,14 +2,13 @@
 'use strict';
 // One-shot installer.
 //
-//   node setup.js [--wow "<client folder>"] [--project "<default work folder>"] [--account <name>]
+//   node setup.js [--wow "<client folder>"] [--server <URL>] [--project "<server folder>"] [--account <name>]
 //
 // Finds the WoW: Forever client, copies the addon into Interface\AddOns, writes
 // bridge/config.json from the example (if missing), and builds the slot pool.
-// Re-running is safe: existing config and generated files are kept.
+// Existing config is kept unless --server or --project explicitly updates it.
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
@@ -74,17 +73,23 @@ function copyAddon(client) {
 }
 
 function writeConfig(client, account) {
-  if (fs.existsSync(CONFIG)) {
+  const existing = fs.existsSync(CONFIG);
+  if (existing && args.server === undefined && args.project === undefined) {
     console.log(`config   : ${CONFIG} already exists, keeping it`);
     return JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
   }
-  const cfg = JSON.parse(fs.readFileSync(EXAMPLE, 'utf8'));
-  cfg.addonDir = path.join(client, 'Interface', 'AddOns');
-  cfg.inboxFile = path.join(cfg.addonDir, 'WoWClaude', 'Inbox.lua');
-  cfg.savedVariablesFile = path.join(client, 'WTF', 'Account', account, 'SavedVariables', 'WoWClaude.lua');
-  cfg.defaultCwd = args.project ? path.resolve(args.project) : process.cwd();
-  const exe = fs.readdirSync(client).find(f => /^Wow.*\.exe$/i.test(f));
-  if (exe) cfg.capture.processName = exe.replace(/\.exe$/i, '');
+  const cfg = JSON.parse(fs.readFileSync(existing ? CONFIG : EXAMPLE, 'utf8'));
+  if (!existing) {
+    cfg.addonDir = path.join(client, 'Interface', 'AddOns');
+    cfg.inboxFile = path.join(cfg.addonDir, 'WoWClaude', 'Inbox.lua');
+    cfg.savedVariablesFile = path.join(client, 'WTF', 'Account', account, 'SavedVariables', 'WoWClaude.lua');
+    cfg.defaultCwd = '';
+    const exe = fs.readdirSync(client).find(f => /^Wow.*\.exe$/i.test(f));
+    if (exe) cfg.capture.processName = exe.replace(/\.exe$/i, '');
+  }
+  // Project paths are server paths: never resolve /home/... against Windows.
+  if (typeof args.project === 'string') cfg.defaultCwd = args.project;
+  if (typeof args.server === 'string') cfg.serverUrl = args.server;
   fs.writeFileSync(CONFIG, JSON.stringify(cfg, null, 2) + '\n');
   console.log(`config   : wrote ${CONFIG}`);
   return cfg;
@@ -98,7 +103,8 @@ try {
   const { dest, copied } = copyAddon(client);
   console.log(`addon    : ${copied} file(s) -> ${dest}`);
   const cfg = writeConfig(client, account);
-  console.log(`project  : ${cfg.defaultCwd}  (use Folders in game, or /oc cd)`);
+  console.log(`server   : ${process.env.OPENCODE_SERVER_URL || cfg.serverUrl}`);
+  console.log(`project  : ${cfg.defaultCwd || '(OpenCode server working directory)'}  (use Folders in game, or /oc cd)`);
   console.log('slots    : building the reply-slot pool and signal files...');
   const r = spawnSync(process.execPath, [path.join(BRIDGE, 'install-slots.js')], { stdio: 'inherit' });
   if (r.status !== 0) throw new Error('install-slots.js failed');
@@ -106,8 +112,8 @@ try {
 Done. Next:
   1. Fully quit and relaunch World of Warcraft (it only discovers new addon files at launch).
   2. Enable "WoW OpenCode" at character select (leave its slot addons enabled).
-  3. Start OpenCode: opencode serve --hostname 127.0.0.1 --port 4096
-  4. In another terminal, start the bridge: npm start
+  3. Make sure OpenCode is running at the configured server URL.
+  4. In this PC's terminal, set OPENCODE_SERVER_PASSWORD (and optionally OPENCODE_SERVER_USERNAME), then run: npm start
   5. In game: /oc, click Connect, then Folders to open your project.
 `);
 } catch (e) {

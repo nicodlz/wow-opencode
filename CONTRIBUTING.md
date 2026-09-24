@@ -14,6 +14,8 @@ Tests cover:
 - Protocol parsing, folder semantics, escaping, deduplication and restoration.
 - HTTP/SSE streaming, dropped-event reconciliation, isolation between sessions and provider errors.
 - The real bridge process with a simulated OpenCode server, filesystem, permission/question responses and restart recovery without duplicate prompts.
+- A simulated authenticated Linux server with folders that do not exist on the bridge PC, including browsing, session attachment, prompt execution, and recovery on Windows/Linux CI.
+- Server-specific POSIX/Windows path handling, default/custom Basic authentication usernames, SSE authentication, and reverse-proxy URL prefixes.
 - On Windows, PNG → `capture.ps1` round trips with noise and gamma changes. This test explicitly skips on Linux; the addon pixel encoder still runs there.
 
 CI runs on both Windows and Ubuntu.
@@ -26,7 +28,7 @@ With `opencode serve` running:
 npm run test:live
 ```
 
-Set `OPENCODE_SERVER_URL` if it is not at `http://127.0.0.1:4096`. The test creates a temporary session, stores a `noReply` message, checks history and SSE, then deletes the session. It does not request model inference. On Linux, `npm exec --package=opencode-ai -- node tests/live_opencode.js --spawn` can launch a temporary server on port 14096.
+Set `OPENCODE_SERVER_URL` if it is not at `http://127.0.0.1:4096`, plus `OPENCODE_SERVER_PASSWORD` and optionally `OPENCODE_SERVER_USERNAME` when authentication is enabled. `WOW_OPENCODE_PROJECT` selects a server folder; otherwise `/path` supplies the default. The test checks authentication and remote folders, creates a temporary session, stores a `noReply` message, checks history and SSE, then deletes the session. It does not request model inference. On Linux, `npm exec --package=opencode-ai -- node tests/live_opencode.js --spawn` launches a temporary authenticated server on port 14096.
 
 ## Layout
 
@@ -34,6 +36,7 @@ Set `OPENCODE_SERVER_URL` if it is not at `http://127.0.0.1:4096`. The test crea
 |---|---|
 | `addon/WoWClaude/` | Game UI and transport; legacy internal names from upstream |
 | `bridge/opencode.js` | OpenCode HTTP/SSE client and stream reconciliation |
+| `bridge/workspace.js` | Server-side path semantics and remote directory browsing |
 | `bridge/bridge.js` | I/O, jobs, controls, persistence, capture and slot publication |
 | `bridge/protocol.js` | Pure parsing and Lua serialization |
 | `bridge/capture.ps1` | Windows pixel decoder |

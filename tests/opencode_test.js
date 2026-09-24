@@ -7,7 +7,7 @@ const { mockOpenCode } = require('./mock_opencode');
 
 test('OpenCode creates a scoped session, streams text and reconciles a dropped stream', { timeout: 8000 }, async t => {
   const api = await mockOpenCode(t);
-  const client = new OpenCode({ serverUrl: api.url, reconcileMs: 30 });
+  const client = new OpenCode({ serverUrl: api.url, reconcileMs: 30 }, {});
   const directory = '/project with spaces/unicode-📁';
   const session = await client.request('/session', directory, { method: 'POST', body: { title: 'WoW' } });
   const updates = [];
@@ -27,11 +27,12 @@ test('OpenCode creates a scoped session, streams text and reconciles a dropped s
   assert.ok(updates.every(s => !s.includes('DO NOT LEAK')));
   assert.ok(api.calls.filter(c => c.route !== '/global/health').every(c => c.directory === directory));
   assert.equal(api.calls.filter(c => c.route.endsWith('/prompt_async')).length, 1);
+  assert.ok(api.calls.every(c => c.authorization === undefined), 'no credentials are sent when the password is unset');
 });
 
 test('recovery never resends a prompt; permission requests survive a missed SSE', { timeout: 8000 }, async t => {
   const api = await mockOpenCode(t);
-  const client = new OpenCode({ serverUrl: api.url, reconcileMs: 20 });
+  const client = new OpenCode({ serverUrl: api.url, reconcileMs: 20 }, {});
   const directory = '/project';
   const session = await client.request('/session', directory, { method: 'POST', body: {} });
   const id = messageID();
@@ -49,7 +50,7 @@ test('recovery never resends a prompt; permission requests survive a missed SSE'
 
 test('provider errors and cancellation terminate the run instead of waiting forever', { timeout: 8000 }, async t => {
   const api = await mockOpenCode(t);
-  const client = new OpenCode({ serverUrl: api.url, reconcileMs: 20 });
+  const client = new OpenCode({ serverUrl: api.url, reconcileMs: 20 }, {});
   const session = await client.request('/session', '/x', { method: 'POST', body: {} });
   api.onPrompt = id => setTimeout(() => api.emit({ type: 'session.error', properties: { sessionID: id, error: { data: { message: 'Provider unavailable' } } } }), 50);
   await assert.rejects(client.run({ directory: '/x', sessionID: session.id, messageID: messageID(), text: 'x', signal: AbortSignal.timeout(2000), onUpdate() {} }), /Provider unavailable/);

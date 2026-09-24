@@ -1,7 +1,7 @@
 'use strict';
 const http = require('node:http');
 
-async function mockOpenCode(t) {
+async function mockOpenCode(t, options = {}) {
   const sessions = new Map();
   const streams = new Set();
   const calls = [];
@@ -20,11 +20,24 @@ async function mockOpenCode(t) {
   };
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
+    const pathname = url.pathname;
     let raw = '';
     for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : undefined;
-    calls.push({ method: req.method, route: url.pathname, directory: url.searchParams.get('directory'), body, authorization: req.headers.authorization });
+    if (options.prefix && url.pathname.startsWith(options.prefix + '/')) url.pathname = url.pathname.slice(options.prefix.length);
+    calls.push({ method: req.method, route: url.pathname, pathname, directory: url.searchParams.get('directory'), query: Object.fromEntries(url.searchParams), body, authorization: req.headers.authorization });
     const json = value => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(value)); };
+    if (options.password !== undefined && req.headers.authorization !== 'Basic ' + Buffer.from(`${options.username || 'opencode'}:${options.password}`).toString('base64')) {
+      res.statusCode = 401;
+      return json({ error: options.authError || 'Unauthorized' });
+    }
+    if (options.prefix && !pathname.startsWith(options.prefix + '/')) { res.statusCode = 404; return json({ error: 'prefix required' }); }
+    if (url.pathname === '/path') return json({ home: options.home || '/home/opencode', directory: url.searchParams.get('directory') || options.directory || '/home/opencode' });
+    if (url.pathname === '/file') {
+      const directory = url.searchParams.get('directory');
+      if (url.searchParams.get('path') !== '.') { res.statusCode = 400; return json({ error: 'relative path required' }); }
+      return json(options.directories?.[directory] || []);
+    }
     if (url.pathname === '/event') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' });
       res.write('data: {"type":"server.connected","properties":{}}\n\n');
@@ -67,7 +80,7 @@ async function mockOpenCode(t) {
     res.statusCode = 404; json({ error: 'unknown route ' + url.pathname });
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  api.url = `http://127.0.0.1:${server.address().port}`;
+  api.url = `http://127.0.0.1:${server.address().port}${options.prefix || ''}`;
   api.closeStreams = () => { for (const stream of streams) stream.end(); };
   t.after(() => { for (const stream of streams) stream.destroy(); server.closeAllConnections(); return new Promise(resolve => server.close(resolve)); });
   return api;

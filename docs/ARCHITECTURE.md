@@ -5,7 +5,7 @@ WoW Forever (Lua)
   ↕ outgoing pixels / incoming load-on-demand addons
 Node.js bridge on Windows
   ↕ HTTP + Server-Sent Events
-opencode serve
+opencode serve (local or remote, including Linux)
   ↕ provider configured in OpenCode
 Model + tools
 ```
@@ -30,6 +30,10 @@ An empty WAV file cannot be played, while a valid silent WAV file can. This dist
 - `/session/:id/abort` and the permission/question reply routes for interactions.
 
 Each WoW chat has a persistent mapping to an OpenCode session and a folder. Changing folders or resetting a chat starts a new session. Old Claude session identifiers are not reused.
+
+`bridge/workspace.js` discovers the server's home and working directory through `/path`. It uses server-specific POSIX or Windows path semantics and `/file` directory listings for navigation and validation. Workspace paths never go through the bridge machine's `realpath`, `stat`, or `readdir`. Local filesystem access is reserved for the addon, capture transport, configuration, and persistent bridge data.
+
+`OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME` supply Basic authentication for HTTP and SSE. `OPENCODE_SERVER_URL` overrides the configured URL; reverse-proxy path prefixes are preserved.
 
 The bridge saves the `messageID` **before** sending. After a restart, it finds that message and monitors its response without executing the prompt again. If the crash occurred before OpenCode accepted the message, an explicit error asks the user to resend it. Persisted data is written using atomic file replacement.
 
@@ -57,6 +61,6 @@ All text is escaped as Lua string literals; model data is never executed as Lua 
 
 ## Scope
 
-The bridge and OpenCode must see the same local paths. The browser reads the bridge's filesystem. Sessions can be attached while idle; monitoring new tasks started from another client is not implemented.
+The Windows bridge and OpenCode may run on different machines and operating systems. The browser reads the server filesystem through its API; no local project mirror is required. The game-side capture remains Windows-specific. Sessions can be attached while idle; monitoring new tasks started from another client is not implemented.
 
 The prototype is tested through a Lua VM, a simulated HTTP/SSE server, and the real OpenCode API. Screen capture and the final appearance need to be checked in the game on Windows. See `CONTRIBUTING.md`.

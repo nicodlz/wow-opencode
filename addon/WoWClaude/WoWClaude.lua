@@ -1406,7 +1406,7 @@ function WoWClaude.SetFolder(rest, c)
 	end
 	rest = Trim(rest or "")
 	if rest == "-" or rest == "default" then rest = "" end
-	local base = run.bridgeCwd or "the bridge's default folder"
+	local base = run.bridgeCwd or "the OpenCode server's default folder"
 	if rest ~= "" then
 		local changed = rest ~= c.cwd
 		c.cwd = rest
@@ -1415,15 +1415,15 @@ function WoWClaude.SetFolder(rest, c)
 		AddHistory(c, "system", "cwd set to " .. rest .. note .. (changed and #c.history > 1 and "; the next message starts a fresh OpenCode session there" or ""))
 	elseif c.cwd ~= "" then
 		c.cwd = ""
-		AddHistory(c, "system", "cwd reset to the bridge's default: " .. base)
+		AddHistory(c, "system", "cwd reset to the OpenCode server's default: " .. base)
 	else
-		AddHistory(c, "system", "cwd is the bridge's default: " .. base .. " (/wow-claude cd <folder>, or right-click the chat and pick Folder, to change)")
+		AddHistory(c, "system", "cwd is the OpenCode server's default: " .. base .. " (/oc cd <folder>, or right-click the chat and pick Folder, to change)")
 	end
 	WoWClaude.Render()
 end
 
 StaticPopupDialogs["WOWCLAUDE_FOLDER"] = {
-	text = "Folder for this session\n\nRelative to the bridge's folder (%s), ~, or a full path.\nEmpty = the bridge's default. Changing it starts a fresh OpenCode session.",
+	text = "Folder on the OpenCode server\n\nRelative to the default project (%s), ~ for the server's home, or an absolute server path.\nEmpty = the server default. Changing it starts a fresh OpenCode session.",
 	button1 = OKAY,
 	button2 = CANCEL,
 	hasEditBox = 1,
@@ -1621,12 +1621,12 @@ function WoWClaude.UpdateStatus()
 	if c and c.cwd ~= "" then
 		cwdText = Display(c.cwd)
 	elseif run.bridgeCwd then
-		cwdText = Display(run.bridgeCwd) .. " (bridge default)"
+		cwdText = Display(run.bridgeCwd) .. " (server default)"
 	else
-		cwdText = "(bridge default - start the bridge in a folder, or right-click the chat and pick Folder)"
+		cwdText = "(server folder - connect, then use Folders to open a project)"
 	end
 	ui.cwd:SetText("cwd: " .. cwdText .. "   slots: " .. (SLOT_COUNT - (run.slotsUsed or 0)) .. "/" .. SLOT_COUNT)
-	if run.backend and not run.backend.healthy then ui.status:SetText("OpenCode offline — start opencode serve, then Connect") end
+	if run.backend and not run.backend.healthy then ui.status:SetText("OpenCode: " .. Display(run.backend.message)) end
 	if c and c.request then ui.status:SetText(c.request.kind == "permission" and "Permission needed — allow once or reject below" or "Answer needed — type an option number or your answer below") end
 	if ui.stop then ui.stop:SetShown(c and c.pendingId ~= nil) end
 	if ui.resend then ui.resend:SetShown(c and c.pendingId ~= nil and mode == "pixel") end
@@ -1762,7 +1762,7 @@ function WoWClaude.Render()
 			if run.restoring then
 				Place("system", "Connecting to the bridge and restoring your chats...", "", true)
 			elseif not WoWClaude.IsConnected() then
-				Place("system", "Start opencode serve, then npm start in wow-opencode. Click Connect below to begin.", "", true)
+				Place("system", "Start the bridge with npm start and connect it to your local or remote OpenCode server. Click Connect below to begin.", "", true)
 			else
 				Place("system", "Open a folder with Folders, then create or resume a session. Type below to chat. Shift-click items, spells and quests to link them. /oc help lists the commands; /ai and /r work from game chat too.", "", true)
 			end
@@ -2388,7 +2388,7 @@ local function BuildUI()
 	connect:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:SetText("Connect to the bridge")
-		GameTooltip:AddLine("Start opencode serve and the companion (npm start in wow-opencode). The light turns green once the bridge answers.", 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine("Start the companion with npm start. It connects to the OpenCode server configured by serverUrl or OPENCODE_SERVER_URL, using OPENCODE_SERVER_PASSWORD when required.", 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
 	connect:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2584,7 +2584,7 @@ local HELP = table.concat({
 	"/wow-claude chat <n|name>          switch chats (or click one in the left panel)",
 	"/wow-claude rename [name]          rename the current chat (no name = dialog; right-clicking the chat in the left panel offers it too)",
 	"/wow-claude delete                 delete the current chat",
-	"/wow-claude cd <folder>            folder this chat's Claude works in (relative to the bridge's folder; no folder = back to default). Right-clicking the chat in the left panel and picking Folder does the same",
+	"/wow-claude cd <folder>            folder on the OpenCode server (relative to the default project; ~ = server home; no folder = back to default). Right-click the chat and pick Folder to change it",
 	"/wow-claude reset                  next message in this chat starts a fresh Claude session",
 	"/wow-claude context [on|off]       what Claude is told about your character and where you are (no argument = show it)",
 	"/wow-claude mode pixel             no-reload transport (default)",

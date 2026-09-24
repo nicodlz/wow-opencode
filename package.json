@@ -25,7 +25,7 @@
     "setup": "node setup.js",
     "start": "node bridge/supervisor.js",
     "slots": "node bridge/install-slots.js",
-    "test": "node tests/order_check.js && node --test tests/bridge_test.js tests/restore_test.js tests/addon_test.js tests/opencode_test.js tests/integration_test.js && node tests/codec_test.js",
+    "test": "node tests/order_check.js && node --test tests/bridge_test.js tests/restore_test.js tests/addon_test.js tests/opencode_test.js tests/integration_test.js tests/workspace_test.js && node tests/codec_test.js",
     "test:live": "node tests/live_opencode.js"
   },
   "devDependencies": {

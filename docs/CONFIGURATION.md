@@ -4,8 +4,8 @@
 
 | Key | Value / purpose |
 |---|---|
-| `serverUrl` | `http://127.0.0.1:4096`, the local `opencode serve` server |
-| `defaultCwd` | Initial folder; overridden by `--project`, `WOW_OPENCODE_PROJECT`, or the launch directory if it is outside the repository |
+| `serverUrl` | `http://127.0.0.1:4096` by default; a local or remote OpenCode URL. `OPENCODE_SERVER_URL` overrides it. Reverse-proxy path prefixes are supported |
+| `defaultCwd` | Folder on the OpenCode server. Empty: use the directory reported by `/path`. Priority: `--project`, then `WOW_OPENCODE_PROJECT`, then this value. Relative paths and `~` are resolved on the server |
 | `model` | Empty: use OpenCode's default model; otherwise `provider/model` |
 | `agent` | Empty: use OpenCode's default agent; otherwise its name, such as `build` or `plan` |
 | `maxParallel` | 3 concurrent tasks; additional tasks are queued |
@@ -34,7 +34,15 @@ The bridge reads the same environment variables as the server:
 - `OPENCODE_SERVER_PASSWORD`
 - `OPENCODE_SERVER_USERNAME` (default: `opencode`)
 
-If you password-protect the server, set these variables in **both terminals**. OpenCode continues to manage provider credentials. The old Claude keys `claudePath`, `allowedTools`, and `permissionMode` are no longer used.
+If you password-protect the server, set matching values in **the server process and the Windows bridge terminal**. The username defaults to `opencode` when omitted. HTTP requests, directory browsing, session controls, and SSE all use the same Basic authentication header. A 401 or 403 produces an explicit configuration error. Passwords are not stored in the config, addon data, or logs; do not put credentials in `serverUrl`.
+
+OpenCode continues to manage provider credentials. The old Claude keys `claudePath`, `allowedTools`, and `permissionMode` are no longer used. See [Remote server setup](REMOTE-SERVER.md) for PowerShell and Linux examples.
+
+## Local files versus server folders
+
+`addonDir`, `inboxFile`, `savedVariablesFile`, and `primerFile` are paths on the **bridge PC**. `defaultCwd`, `--project`, `WOW_OPENCODE_PROJECT`, and paths entered in the game are paths on the **OpenCode server**.
+
+The bridge discovers the server's path format and home through `/path`, then browses and validates folders through `/file`. Linux paths remain case-sensitive even when the bridge runs on Windows. An empty `defaultCwd` uses the server's working directory; the Windows terminal's working directory is not sent as an implicit project path.
 
 ## Bridge arguments
 

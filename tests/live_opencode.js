@@ -4,11 +4,14 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { setTimeout: sleep } = require('node:timers/promises');
 const { OpenCode, messageID } = require('../bridge/opencode');
+const { ServerWorkspace } = require('../bridge/workspace');
+const { randomBytes } = require('node:crypto');
 
 async function main() {
   let server;
   if (process.argv.includes('--spawn')) {
     process.env.OPENCODE_SERVER_URL = 'http://127.0.0.1:14096';
+    process.env.OPENCODE_SERVER_PASSWORD ||= randomBytes(24).toString('hex');
     server = spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', '14096'], { stdio: ['ignore', 'pipe', 'pipe'] });
     server.stdout.on('data', data => process.stdout.write(data));
     server.stderr.on('data', data => process.stderr.write(data));
@@ -16,7 +19,6 @@ async function main() {
     process.on('exit', () => server.kill());
   }
   const client = new OpenCode({ serverUrl: process.env.OPENCODE_SERVER_URL });
-  const directory = process.cwd();
   if (server) {
     let ready = false;
     for (let i = 0; i < 60; i++) {
@@ -26,6 +28,18 @@ async function main() {
   }
   try {
   console.log('Health:', await client.request('/global/health'));
+  if (process.env.OPENCODE_SERVER_PASSWORD) {
+    const anonymous = new OpenCode({ serverUrl: client.url.href }, {});
+    await assert.rejects(anonymous.request('/global/health'), error => error.status === 401 || error.status === 403);
+  }
+  const workspace = new ServerWorkspace(client, process.env.WOW_OPENCODE_PROJECT || '');
+  await workspace.initialize();
+  const directory = await workspace.directory('');
+  const listing = await workspace.folders(directory);
+  assert.equal(listing.path, directory);
+  assert.ok(Array.isArray(listing.items));
+  await assert.rejects(workspace.directory(workspace.paths.resolve('wow-opencode-missing-' + randomBytes(8).toString('hex'))), /Folder not found/);
+  console.log('Server folder:', directory);
   const session = await client.request('/session', directory, { method: 'POST', body: { title: 'wow-opencode smoke test (temporary)' } });
   try {
     assert.ok(session.id.startsWith('ses_'));
@@ -56,7 +70,7 @@ async function main() {
     } catch (error) { if (!controller.signal.aborted) throw error; }
     finally { clearTimeout(timer); }
     assert.ok(connected, 'SSE connection established');
-    console.log('PASS: real OpenCode health, sessions, prompt_async (noReply), history, permissions, questions, status and SSE.');
+    console.log('PASS: real OpenCode authentication, remote paths/folders, sessions, prompt_async (noReply), history, permissions, questions, status and SSE.');
   } finally {
     await client.request(`/session/${session.id}`, directory, { method: 'DELETE' });
   }

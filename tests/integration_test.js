@@ -9,19 +9,31 @@ const { setTimeout: sleep } = require('node:timers/promises');
 const { mockOpenCode } = require('./mock_opencode');
 
 test('real bridge: folder/session controls, prompt, permission, question, stop and restart recovery', { timeout: 30000 }, async t => {
-  const api = await mockOpenCode(t);
+  // These folders exist only on the simulated Linux server, never on the bridge.
+  const home = '/home/opencode';
+  const folder = home + '/project with spaces';
+  const password = 'integration-password';
+  const username = 'remote-user';
+  const directories = {
+    '/home': [{ name: 'opencode', absolute: home, type: 'directory' }],
+    [home]: [{ name: 'project with spaces', absolute: folder, type: 'directory' }],
+    [folder]: [],
+  };
+  const api = await mockOpenCode(t, { home, directory: home, directories, password, username, prefix: '/opencode' });
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wow-opencode-test-'));
   const addons = path.join(root, 'AddOns');
-  fs.mkdirSync(path.join(root, 'project with spaces'));
   fs.mkdirSync(path.join(addons, 'WoWClaude'), { recursive: true });
   fs.mkdirSync(path.join(addons, 'WoWClaude_S001'));
   for (const dir of ['sig', 'ack', 'act/001', 'presence']) fs.mkdirSync(path.join(addons, 'WoWClaude', dir), { recursive: true });
-  const config = { addonDir: addons, defaultCwd: root, inboxFile: path.join(addons, 'WoWClaude', 'Inbox.lua'), savedVariablesFile: path.join(root, 'Saved.lua'), serverUrl: api.url, capture: { enabled: false }, slots: 1, actMax: 2, presenceMax: 2, pollMs: 25, progressWriteMs: 25, reconcileMs: 30, timeoutMs: 10000 };
+  const config = { addonDir: addons, defaultCwd: '~/project with spaces', inboxFile: path.join(addons, 'WoWClaude', 'Inbox.lua'), savedVariablesFile: path.join(root, 'Saved.lua'), serverUrl: api.url, capture: { enabled: false }, slots: 1, actMax: 2, presenceMax: 2, pollMs: 25, progressWriteMs: 25, reconcileMs: 30, timeoutMs: 10000 };
   fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(config));
   let bridge;
   let output = '';
   const start = () => {
-    bridge = spawn(process.execPath, [path.join(__dirname, '../bridge/bridge.js'), '--config', path.join(root, 'config.json')], { stdio: ['ignore', 'pipe', 'pipe'] });
+    bridge = spawn(process.execPath, [path.join(__dirname, '../bridge/bridge.js'), '--config', path.join(root, 'config.json')], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, OPENCODE_SERVER_URL: api.url, OPENCODE_SERVER_PASSWORD: password, OPENCODE_SERVER_USERNAME: username },
+    });
     bridge.stdout.on('data', data => { output += data; }); bridge.stderr.on('data', data => { output += data; });
   };
   const stop = async () => {
@@ -44,9 +56,9 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
   };
   start();
   await wait(() => output.includes('OpenCode mock'));
-  let id = await send(root, 'folders');
+  let id = await send('~', 'folders');
   assert.ok(state().controls[`abc:${id}`].items.some(i => i.name === 'project with spaces'));
-  const folder = path.join(root, 'project with spaces');
+  assert.equal(state().controls[`abc:${id}`].path, home);
   id = await send(folder, 'open');
   const sessionID = state().controls[`abc:${id}`].session;
   assert.ok(sessionID);
@@ -55,6 +67,12 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
   id = await send('hello', undefined, folder);
   await wait(() => state().live?.['abc:c1']?.status === 'done');
   assert.match(state().live['abc:c1'].text, /Hello/);
+  // Reattach using a relative path and import the remote transcript.
+  id = await send(sessionID, 'attach', '../project with spaces');
+  assert.equal(state().controls[`abc:${id}`].session, sessionID);
+  assert.ok(state().controls[`abc:${id}`].messages.some(m => m.text.includes('Hello from OpenCode')));
+  id = await send(home + '/missing', 'open');
+  assert.match(state().controls[`abc:${id}`].error, /Folder not found/);
   api.onPrompt = sid => { api.sessions.get(sid).permission = { id: 'per_1', sessionID: sid, permission: 'bash', patterns: ['npm test'] }; };
   await send('test', undefined, folder);
   await wait(() => state().live?.['abc:c1']?.request?.id === 'per_1');
@@ -84,4 +102,9 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
   await wait(() => state().live?.['abc:c1']?.status === 'done');
   assert.equal(api.sessions.get(sessionID).busy, false);
   assert.ok(fs.readFileSync(config.inboxFile, 'utf8').includes('Stopped.'));
+  const expectedAuth = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+  assert.ok(api.calls.every(call => call.authorization === expectedAuth));
+  assert.ok(api.calls.some(call => call.route === '/event'));
+  assert.ok(api.calls.every(call => !call.directory || call.directory.startsWith('/home')));
+  assert.ok(!output.includes(password));
 });

@@ -17,7 +17,7 @@ local function Render()
 	local b = browser
 	local data = b.data or {}
 	local items = b.recentMode and b.recent or data.items or {}
-	b.title:SetText(b.mode == "folders" and "Open a project folder" or "Resume an OpenCode session")
+	b.title:SetText(b.mode == "folders" and "Open a folder on the OpenCode server" or "Resume an OpenCode session")
 	b.path:SetText(data.path or OC.CurrentFolder())
 	b.status:SetText(b.loading and "Loading…" or b.error or (#items == 0 and "Nothing here yet. Open a folder or create a session." or #items .. " entries · page " .. b.page .. "/" .. math.max(1, math.ceil(#items / PAGE_SIZE))))
 	for i, row in ipairs(b.rows) do

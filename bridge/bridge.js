@@ -7,6 +7,7 @@ const readline = require('node:readline');
 const { spawn } = require('node:child_process');
 const P = require('./protocol');
 const { OpenCode, messageID } = require('./opencode');
+const { ServerWorkspace } = require('./workspace');
 
 const HERE = __dirname;
 const ROOT = path.dirname(HERE);
@@ -24,11 +25,10 @@ const DATA = path.dirname(configFile);
 const stateFile = path.join(DATA, 'state.json');
 const transcriptFile = path.join(DATA, 'transcripts.json');
 const lockFile = path.join(DATA, 'bridge.lock');
-const relative = path.relative(ROOT, process.cwd());
-const outsideRepo = relative.startsWith('..') || path.isAbsolute(relative);
-const cwd = path.resolve(arg('--project') || process.env.WOW_OPENCODE_PROJECT || (outsideRepo && process.cwd()) || cfg.defaultCwd || process.cwd());
+let cwd = '';
 const slots = cfg.slots || 200;
 const client = new OpenCode(cfg);
+const workspace = new ServerWorkspace(client, arg('--project') || process.env.WOW_OPENCODE_PROJECT || cfg.defaultCwd || '');
 const once = argv.includes('--once');
 const inject = arg('--inject');
 const exitWhenIdle = once || inject !== undefined;
@@ -125,16 +125,13 @@ function offerRestore(job) {
   saveTranscripts();
 }
 function remember(directory) {
-  state.recent = [directory, ...state.recent.filter(d => !P.sameFolder(d, directory))].slice(0, 20);
-}
-function directory(raw) {
-  const result = fs.realpathSync(P.resolveCwd(raw, cwd));
-  if (!fs.statSync(result).isDirectory()) throw new Error(`Not a folder: ${result}`);
-  return result;
+  state.recent = [directory, ...state.recent.filter(d => !workspace.same(d, directory))].slice(0, 20);
 }
 async function health() {
   try {
     const result = await client.request('/global/health');
+    await workspace.initialize();
+    cwd = workspace.defaultDirectory;
     backend = { healthy: result.healthy === true, message: `OpenCode ${result.version || ''}` };
   } catch (error) { backend = { healthy: false, message: error.message }; }
 }
@@ -145,27 +142,23 @@ async function control(job) {
   controlling.add(key);
   const result = { token: job.session, id: job.id, chat: job.chat, op: job.op };
   try {
-    const dir = ['folders', 'open'].includes(job.op) ? cwd : directory(job.cwd);
+    const dir = ['folders', 'open', 'abort'].includes(job.op) ? cwd : await workspace.directory(job.op === 'sessions' ? job.text || job.cwd : job.cwd);
     const skey = P.sessKey(job);
     const sessionID = state.sessions[skey];
     if (job.op === 'folders') {
-      const target = directory(job.text || dir);
-      result.path = target;
-      result.parent = path.dirname(target);
-      result.items = fs.readdirSync(target, { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules')
-        .sort((a, b) => a.name.localeCompare(b.name)).map(d => ({ name: d.name, value: path.join(target, d.name) }));
+      Object.assign(result, await workspace.folders(job.text || job.cwd));
       result.recent = state.recent;
     } else if (job.op === 'sessions') {
       result.path = dir;
-      result.items = (await client.request('/session', dir)).filter(s => !s.parentID && !s.time?.archived && P.sameFolder(s.directory, dir))
+      result.items = (await client.request('/session', dir)).filter(s => !s.parentID && !s.time?.archived && workspace.same(s.directory, dir))
         .sort((a, b) => b.time.updated - a.time.updated).map(s => ({ name: s.title || s.id, value: s.id }));
     } else if (job.op === 'open' || job.op === 'attach') {
       if (Object.values(state.jobs).some(j => j.chat === job.chat)) throw new Error('Stop the current session before switching folders or sessions.');
-      const target = job.op === 'open' ? directory(job.text) : dir;
+      const target = job.op === 'open' ? await workspace.directory(job.text) : dir;
       let session;
       if (job.op === 'attach') {
         session = await client.request(`/session/${encodeURIComponent(job.text)}`, target);
-        if (!P.sameFolder(session.directory, target)) throw new Error('This session belongs to another folder.');
+        if (!workspace.same(session.directory, target)) throw new Error('This session belongs to another folder.');
         const statuses = await client.request('/session/status', target);
         if (statuses[session.id] && statuses[session.id].type !== 'idle') throw new Error('Session is running in another client. Attach once it finishes.');
       } else session = await client.request('/session', target, { method: 'POST', body: { title: job.name || 'WoW session' } });
@@ -279,13 +272,13 @@ function drain() {
 }
 async function run(job, controller) {
   const recover = !!job.messageID;
-  job.cwd = directory(job.cwd);
+  job.cwd = await workspace.directory(job.cwd);
   const skey = P.sessKey(job);
   let timer;
   try {
     if (!recover) {
       let sessionID = state.sessions[skey];
-      if (job.newSession || !P.sameFolder(state.sessionCwd[skey], job.cwd)) sessionID = null;
+      if (job.newSession || !workspace.same(state.sessionCwd[skey], job.cwd)) sessionID = null;
       if (!sessionID) sessionID = (await client.request('/session', job.cwd, { method: 'POST', body: { title: job.name || 'WoW session' }, signal: controller.signal })).id;
       const statuses = await client.request('/session/status', job.cwd, { signal: controller.signal });
       if (statuses[sessionID] && statuses[sessionID].type !== 'idle') throw new Error('This OpenCode session is already running in another chat or client.');
@@ -370,7 +363,7 @@ function stop() {
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
 
-log(`WoW OpenCode — ${cwd} — ${client.url}`);
+log(`WoW OpenCode — ${client.url} — folders are resolved on the OpenCode server`);
 health().then(() => {
   log(backend.message); publishNow(); drain();
   if (inject !== undefined) submit({ id: state.lastId + 1, session: '', chat: '', text: inject, cwd }).catch(error => { log(error.message); process.exit(1); });

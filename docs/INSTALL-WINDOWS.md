@@ -2,6 +2,8 @@
 
 ## Set up OpenCode
 
+If OpenCode already runs on a Linux or other remote server, follow [Remote server setup](REMOTE-SERVER.md). You only need Git and Node.js on the Windows game PC; keep using the provider configured on your server.
+
 Install Git and Node.js 22.2 or newer, then run in PowerShell:
 
 ```powershell
@@ -53,7 +55,7 @@ In the repository:
 npm link
 ```
 
-You can then run `wow-opencode` from a project folder, or use `wow-opencode --project "C:\dev\another-project"`. Only one bridge should use the slot pool at a time. The OpenCode server still needs to be started separately.
+You can then run `wow-opencode` from any folder. Use `wow-opencode --project "C:\dev\another-project"` for a Windows server or `wow-opencode --project "/home/user/project"` for a Linux server. Without an explicit project, the configured default or server working directory is used. Only one bridge should use the slot pool at a time. The OpenCode server still needs to be started separately.
 
 ## Updating
 
@@ -65,7 +67,7 @@ npm ci
 node setup.js --wow "C:\Games\World of Warcraft\_forever_"
 ```
 
-Your existing configuration is preserved. Edit `bridge/config.json` if any paths have changed. Fully restart WoW if addon files have been added, then restart the bridge.
+Your existing configuration is preserved; explicitly passing `--server` or `--project` updates those connection settings. Edit `bridge/config.json` if local addon paths have changed. Fully restart WoW if addon files have been added, then restart the bridge. Updating existing Lua files only requires `/reload` after copying them.
 
 ## Troubleshooting
 
@@ -75,12 +77,13 @@ Your existing configuration is preserved. Edit `bridge/config.json` if any paths
 | No outgoing messages | Keep the game visible, not minimized, and out of exclusive fullscreen; check that `capture.processName` matches the executable; inspect `bridge/bridge.log`. |
 | Reply slots not installed | Rerun `node setup.js`, fully quit WoW, and enable the slot addons. |
 | Updates have stopped | Run `/oc slots`, then click Reload; `/oc diag` checks the signal channel. |
-| Folder not found | In Folders, enter a Windows path on the PC running the bridge. A WSL path such as `/home/...` is not a Windows path. |
+| Folder not found | Enter a path on the OpenCode server: `/home/...` or `~/...` for Linux, a drive path for Windows. Check `defaultCwd` when migrating from a local server. |
+| Authentication failed (401/403) | Set `OPENCODE_SERVER_PASSWORD` and, if customized, `OPENCODE_SERVER_USERNAME` in the terminal running the bridge. Restart the bridge after changing them. |
 | Session already busy | Wait for it to finish in the other client, or create a new session. |
 | PowerShell window closes | Run `npm start` from an already-open terminal so you can read the error. |
 | Folders or configuration moved | Correct the paths in `bridge/config.json`; the installer preserves this file if it already exists. |
 
-With the server running, `npm run test:live` checks its routes and SSE stream by creating and then deleting a temporary session. It stores a message with `noReply`, without requesting model inference.
+With the server running, `npm run test:live` checks authentication, remote folders, routes, and SSE by creating and then deleting a temporary session. It uses `OPENCODE_SERVER_URL`, the authentication variables, and optionally `WOW_OPENCODE_PROJECT`. It stores a message with `noReply`, without requesting model inference.
 
 ## In-game validation still needed
 

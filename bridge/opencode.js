@@ -5,25 +5,36 @@ const { setTimeout: sleep } = require('node:timers/promises');
 
 // No shell or CLI output parsing: OpenCode owns sessions, tools and permissions.
 class OpenCode {
-  constructor(config = {}) {
-    this.url = new URL(config.serverUrl || 'http://127.0.0.1:4096');
+  constructor(config = {}, env = process.env) {
+    this.url = new URL(env.OPENCODE_SERVER_URL || config.serverUrl || 'http://127.0.0.1:4096');
     if (!['http:', 'https:'].includes(this.url.protocol)) throw new Error('Invalid OpenCode serverUrl');
+    if (this.url.username || this.url.password) throw new Error('Use OPENCODE_SERVER_PASSWORD and OPENCODE_SERVER_USERNAME instead of credentials in serverUrl.');
+    if (this.url.search || this.url.hash) throw new Error('OpenCode serverUrl must not contain a query string or fragment.');
+    if (!this.url.pathname.endsWith('/')) this.url.pathname += '/';
     this.headers = { 'Content-Type': 'application/json' };
-    const password = process.env.OPENCODE_SERVER_PASSWORD;
+    const password = env.OPENCODE_SERVER_PASSWORD;
     if (password) this.headers.Authorization = 'Basic ' + Buffer.from(
-      `${process.env.OPENCODE_SERVER_USERNAME || 'opencode'}:${password}`).toString('base64');
+      `${env.OPENCODE_SERVER_USERNAME || 'opencode'}:${password}`).toString('base64');
     this.reconcileMs = config.reconcileMs || 3000;
   }
 
-  async request(route, directory, { method = 'GET', body, signal, stream = false } = {}) {
-    const url = new URL(route, this.url);
+  async request(route, directory, { method = 'GET', body, signal, stream = false, query = {} } = {}) {
+    const url = new URL(route.replace(/^\//, ''), this.url);
+    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
     if (directory) url.searchParams.set('directory', directory);
     const timeout = AbortSignal.timeout(stream ? 3600000 : 15000);
     const response = await fetch(url, {
       method, headers: this.headers, body: body === undefined ? undefined : JSON.stringify(body),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
-    if (!response.ok) throw new Error(`OpenCode ${method} ${url.pathname}: ${response.status} ${(await response.text()).slice(0, 500)}`);
+    if (!response.ok) {
+      const authentication = response.status === 401 || response.status === 403;
+      const detail = authentication
+        ? 'Authentication failed. Set OPENCODE_SERVER_PASSWORD and, if customized on the server, OPENCODE_SERVER_USERNAME in the bridge terminal (default username: opencode).'
+        : (await response.text()).slice(0, 500);
+      if (authentication) await response.body?.cancel();
+      throw new OpenCodeHTTPError(response.status, `OpenCode ${method} ${url.pathname}: ${response.status} ${detail}`);
+    }
     if (stream) return response;
     return response.status === 204 ? undefined : response.json();
   }
@@ -127,7 +138,7 @@ class OpenCode {
             throw new RunError('This message was not accepted before the bridge stopped. Send it again.');
           }
         } catch (error) {
-          if (signal.aborted || error instanceof RunError) throw error;
+          if (signal.aborted || error instanceof RunError || (error instanceof OpenCodeHTTPError && [400, 401, 403, 404].includes(error.status))) throw error;
           transport = `OpenCode unavailable; reconnecting… ${error.message}`; emit();
         }
         await sleep(this.reconcileMs, undefined, { signal });
@@ -142,8 +153,12 @@ class OpenCode {
 
 class RunError extends Error {}
 
+class OpenCodeHTTPError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
 function messageID() {
   return 'msg_' + Date.now().toString(16).padStart(12, '0') + randomBytes(8).toString('hex');
 }
 
-module.exports = { OpenCode, messageID };
+module.exports = { OpenCode, OpenCodeHTTPError, messageID };
