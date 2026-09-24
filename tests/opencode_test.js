@@ -8,7 +8,7 @@ const { mockOpenCode } = require('./mock_opencode');
 test('OpenCode creates a scoped session, streams text and reconciles a dropped stream', { timeout: 8000 }, async t => {
   const api = await mockOpenCode(t);
   const client = new OpenCode({ serverUrl: api.url, reconcileMs: 30 });
-  const directory = '/project with spaces/été';
+  const directory = '/project with spaces/unicode-📁';
   const session = await client.request('/session', directory, { method: 'POST', body: { title: 'WoW' } });
   const updates = [];
   api.onPrompt = id => {
@@ -21,8 +21,8 @@ test('OpenCode creates a scoped session, streams text and reconciles a dropped s
       setTimeout(() => api.complete(id), 70);
     }, 50);
   };
-  const result = await client.run({ directory, sessionID: session.id, messageID: messageID(), text: 'Salut', signal: AbortSignal.timeout(5000), onUpdate: u => updates.push(u.text) });
-  assert.equal(result, 'Bonjour depuis OpenCode ✓');
+  const result = await client.run({ directory, sessionID: session.id, messageID: messageID(), text: 'Hello', signal: AbortSignal.timeout(5000), onUpdate: u => updates.push(u.text) });
+  assert.equal(result, 'Hello from OpenCode ✓');
   assert.ok(updates.some(s => s.includes('Streaming ✓')));
   assert.ok(updates.every(s => !s.includes('DO NOT LEAK')));
   assert.ok(api.calls.filter(c => c.route !== '/global/health').every(c => c.directory === directory));

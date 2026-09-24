@@ -1,57 +1,57 @@
 # Configuration
 
-`node setup.js` génère `bridge/config.json` depuis `bridge/config.example.json`. Ce fichier et les données de session sont ignorés par Git.
+`node setup.js` generates `bridge/config.json` from `bridge/config.example.json`. This file and session data are ignored by Git.
 
-| Clé | Valeur / rôle |
+| Key | Value / purpose |
 |---|---|
-| `serverUrl` | `http://127.0.0.1:4096`, serveur `opencode serve` local |
-| `defaultCwd` | Dossier initial ; remplacé par `--project`, `WOW_OPENCODE_PROJECT` ou le dossier de lancement si celui-ci est hors du dépôt |
-| `model` | Vide : modèle OpenCode par défaut ; sinon `provider/model` |
-| `agent` | Vide : agent OpenCode par défaut ; sinon son nom, par exemple `build` ou `plan` |
-| `maxParallel` | 3 tâches simultanées ; les autres restent en attente |
-| `timeoutMs` | 1800000 (30 minutes) ; le bridge demande l’arrêt de la session à expiration |
-| `progressWriteMs` | 1500 ; limite la fréquence d’écriture des états intermédiaires |
-| `reconcileMs` | 3000 si absent ; vérification des messages, état et interactions pour récupérer les événements SSE manqués |
-| `pollMs` | 750 ; lecture du chemin SavedVariables de secours |
-| `gameContext` | `true` ; autorise le contexte du personnage, sauf si désactivé en jeu avec `/oc context off` |
-| `primerFile` | `docs/WOW-ADDON-PRIMER.md` ; référence WoW ajoutée avec le contexte. Chaîne vide : désactivée |
-| `addonDir` | Dossier `Interface\AddOns` du client |
+| `serverUrl` | `http://127.0.0.1:4096`, the local `opencode serve` server |
+| `defaultCwd` | Initial folder; overridden by `--project`, `WOW_OPENCODE_PROJECT`, or the launch directory if it is outside the repository |
+| `model` | Empty: use OpenCode's default model; otherwise `provider/model` |
+| `agent` | Empty: use OpenCode's default agent; otherwise its name, such as `build` or `plan` |
+| `maxParallel` | 3 concurrent tasks; additional tasks are queued |
+| `timeoutMs` | 1800000 (30 minutes); the bridge requests a session abort when the timeout expires |
+| `progressWriteMs` | 1500; limits how often intermediate states are written |
+| `reconcileMs` | 3000 if omitted; checks messages, status, and interactions to recover missed SSE events |
+| `pollMs` | 750; polling interval for the SavedVariables fallback |
+| `gameContext` | `true`; allows character context unless disabled in game with `/oc context off` |
+| `primerFile` | `docs/WOW-ADDON-PRIMER.md`; WoW reference included with the context. Empty string: disabled |
+| `addonDir` | The client's `Interface\AddOns` folder |
 | `inboxFile` | `Interface\AddOns\WoWClaude\Inbox.lua` |
-| `savedVariablesFile` | `WTF\Account\<compte>\SavedVariables\WoWClaude.lua` |
-| `capture.enabled` | `true` ; capture PowerShell. `false` pour tests ou utilisation du transport reload |
-| `capture.processName` | Exécutable du jeu sans `.exe`, normalement `WowB` |
-| `capture.intervalMs` | 250 ; fréquence de lecture des pixels |
-| `tocInterface` | `16001` pour Forever |
-| `slots` / `actMax` / `presenceMax` | 200 / 60 / 2000 ; doivent correspondre aux constantes Lua et aux fichiers générés |
-| `presenceIntervalMs` | 30000 ; heartbeat du bridge |
+| `savedVariablesFile` | `WTF\Account\<account>\SavedVariables\WoWClaude.lua` |
+| `capture.enabled` | `true`; PowerShell screen capture. Use `false` for tests or the reload transport |
+| `capture.processName` | Game executable without `.exe`, usually `WowB` |
+| `capture.intervalMs` | 250; pixel capture interval |
+| `tocInterface` | `16001` for Forever |
+| `slots` / `actMax` / `presenceMax` | 200 / 60 / 2000; must match the Lua constants and generated files |
+| `presenceIntervalMs` | 30000; bridge heartbeat interval |
 
-Ne change pas `capture.cellPx`, `cellsPerRow`, `maxRows` ou les tailles de pools sans adapter les constantes de l’addon et réinstaller les slots.
+Do not change `capture.cellPx`, `cellsPerRow`, `maxRows`, or the pool sizes without updating the addon constants and reinstalling the slots.
 
-## Authentification du serveur
+## Server authentication
 
-Le bridge lit les mêmes variables d’environnement que le serveur :
+The bridge reads the same environment variables as the server:
 
 - `OPENCODE_SERVER_PASSWORD`
-- `OPENCODE_SERVER_USERNAME` (défaut : `opencode`)
+- `OPENCODE_SERVER_USERNAME` (default: `opencode`)
 
-Si tu protèges le serveur par mot de passe, définis ces variables dans **les deux terminaux**. Les identifiants du fournisseur restent gérés par OpenCode. Les anciennes clés Claude `claudePath`, `allowedTools` et `permissionMode` ne sont plus utilisées.
+If you password-protect the server, set these variables in **both terminals**. OpenCode continues to manage provider credentials. The old Claude keys `claudePath`, `allowedTools`, and `permissionMode` are no longer used.
 
-## Arguments du bridge
+## Bridge arguments
 
 ```text
-wow-opencode --project <dossier>
-node bridge/bridge.js --config <fichier>
-node bridge/bridge.js --inject "message de test"
+wow-opencode --project <folder>
+node bridge/bridge.js --config <file>
+node bridge/bridge.js --inject "test message"
 node bridge/bridge.js --once
 ```
 
-`--inject` lance réellement un prompt via le fournisseur OpenCode. `--once` traite une sortie SavedVariables puis quitte. `--config` place aussi les fichiers d’état dans le dossier du fichier choisi ; utile pour les tests.
+`--inject` sends a real prompt through the OpenCode provider. `--once` processes a SavedVariables outbox entry and exits. `--config` also places state files in the selected configuration file's directory, which is useful for testing.
 
-## Fichiers locaux
+## Local files
 
-- `state.json` : associations chat/session, tâches en cours, résultats et accusés de réception.
-- `transcripts.json` : copie des conversations pour restaurer l’addon si le client réinitialise ses données.
-- `bridge.log` : démarrage, erreurs de transport et fins de tâches.
-- `bridge.lock` : PID du bridge ; une instance vivante empêche un second lancement.
+- `state.json`: chat/session mappings, active tasks, results, and acknowledgements.
+- `transcripts.json`: conversation copies used to restore the addon if the client resets its data.
+- `bridge.log`: startup messages, transport errors, and task completion logs.
+- `bridge.lock`: the bridge PID; a running instance prevents a second one from starting.
 
-Ces fichiers restent locaux. Le bridge ne crée aucun partage public de session. Supprimer un chat WoW n’efface pas sa session OpenCode.
+These files remain local. The bridge does not create public session shares. Deleting a WoW chat does not delete its OpenCode session.

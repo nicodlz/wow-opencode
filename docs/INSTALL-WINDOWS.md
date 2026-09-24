@@ -1,8 +1,8 @@
-# Installation Windows
+# Windows installation
 
-## Préparer OpenCode
+## Set up OpenCode
 
-Installe Git et Node.js 22.2 ou plus récent, puis dans PowerShell :
+Install Git and Node.js 22.2 or newer, then run in PowerShell:
 
 ```powershell
 npm install -g opencode-ai
@@ -10,54 +10,54 @@ opencode --version
 opencode
 ```
 
-Dans OpenCode, `/connect` permet de connecter un fournisseur et `/models` de choisir un modèle. Vérifie qu’un message simple reçoit une réponse avant de passer à WoW.
+In OpenCode, use `/connect` to connect a provider and `/models` to choose a model. Check that a simple message receives a reply before moving on to WoW.
 
-## Installer le projet
+## Install the project
 
 ```powershell
 git clone https://github.com/nicodlz/wow-opencode.git
 cd wow-opencode
 npm ci
-node setup.js --wow "C:\Games\World of Warcraft\_forever_" --project "C:\dev\mon-projet"
+node setup.js --wow "C:\Games\World of Warcraft\_forever_" --project "C:\dev\my-project"
 ```
 
-Le dossier `--wow` doit contenir `WowB.exe` (ou un autre `Wow*.exe`) et `Interface`. Selon l’installation, il peut s’appeler `_classic_beta_`. Connecte-toi une fois au jeu pour que le dossier `WTF\Account` existe. Pour sélectionner un compte parmi plusieurs : `--account "NOM"`.
+The `--wow` folder must contain `WowB.exe` (or another `Wow*.exe`) and `Interface`. Depending on your installation, it may be called `_classic_beta_`. Log into the game once so that the `WTF\Account` folder exists. To choose between multiple accounts, add `--account "NAME"`.
 
-`setup.js` copie les fichiers dans `Interface\AddOns\WoWClaude`, puis crée `WoWClaude_S001` à `WoWClaude_S200`. Le nom de dossier technique vient du transport amont ; le titre affiché est **WoW OpenCode**.
+`setup.js` copies the files to `Interface\AddOns\WoWClaude`, then creates `WoWClaude_S001` through `WoWClaude_S200`. The internal folder names come from the upstream transport; the displayed title is **WoW OpenCode**.
 
-Quitte entièrement le jeu, relance-le et active **WoW OpenCode** ainsi que les addons de slots. Le jeu découvre les nouveaux fichiers uniquement au lancement.
+Fully quit the game, relaunch it, and enable **WoW OpenCode** along with its slot addons. The game only discovers new files at launch.
 
-## À chaque session de jeu
+## Each time you play
 
-Terminal 1 :
+Terminal 1:
 
 ```powershell
 opencode serve --hostname 127.0.0.1 --port 4096
 ```
 
-Terminal 2, dans le dépôt :
+Terminal 2, in the repository:
 
 ```powershell
 npm start
 ```
 
-Dans WoW en mode fenêtré/sans bordure : `/oc` → **Connect** → **Folders** → **Open this folder**. La session créée utilise le modèle et les permissions d’OpenCode. **Sessions** reprend une conversation existante et **Stop** arrête la tâche courante.
+In WoW, using windowed or borderless mode: `/oc` → **Connect** → **Folders** → **Open this folder**. The new session uses OpenCode's model and permissions. **Sessions** resumes an existing conversation, and **Stop** interrupts the current task.
 
-Un clic droit sur un chat propose Rename et Folder. Le bouton de suppression ferme le chat et oublie sa copie locale ; la session reste disponible dans OpenCode et peut être reprise depuis Sessions.
+Right-click a chat for Rename and Folder options. The delete button closes the chat and forgets its local copy; the session remains available in OpenCode and can be resumed through Sessions.
 
-## Commande globale facultative
+## Optional global command
 
-Dans le dépôt :
+In the repository:
 
 ```powershell
 npm link
 ```
 
-Tu peux ensuite lancer `wow-opencode` depuis le dossier d’un projet, ou `wow-opencode --project "C:\dev\autre-projet"`. Un seul bridge doit utiliser les slots à la fois. Le serveur OpenCode reste à lancer séparément.
+You can then run `wow-opencode` from a project folder, or use `wow-opencode --project "C:\dev\another-project"`. Only one bridge should use the slot pool at a time. The OpenCode server still needs to be started separately.
 
-## Mise à jour
+## Updating
 
-Arrête le bridge, puis dans le dépôt :
+Stop the bridge, then run in the repository:
 
 ```powershell
 git pull --ff-only
@@ -65,23 +65,23 @@ npm ci
 node setup.js --wow "C:\Games\World of Warcraft\_forever_"
 ```
 
-La configuration existante est conservée. Modifie `bridge/config.json` si les chemins ont changé. Redémarre complètement WoW si des fichiers d’addon ont été ajoutés, puis relance le bridge.
+Your existing configuration is preserved. Edit `bridge/config.json` if any paths have changed. Fully restart WoW if addon files have been added, then restart the bridge.
 
-## Dépannage
+## Troubleshooting
 
-| Symptôme | Vérifications |
+| Symptom | What to check |
 |---|---|
-| OpenCode offline | `opencode serve` écoute sur le port de `serverUrl` ; vérifie aussi l’authentification du serveur si activée. |
-| Aucun message sortant | Jeu visible, pas minimisé, pas de plein écran exclusif ; `capture.processName` correspond à l’exécutable ; regarde `bridge/bridge.log`. |
-| Reply slots not installed | Réexécute `node setup.js`, quitte entièrement WoW, réactive les addons de slots. |
-| Plus de mises à jour | `/oc slots`, puis bouton Reload ; `/oc diag` vérifie le canal de signal. |
-| Chemin introuvable | Dans Folders, saisis un chemin Windows du PC où tourne le bridge. Un chemin WSL `/home/...` n’est pas un chemin Windows. |
-| Session déjà occupée | Attends la fin de son exécution dans l’autre client ou crée une nouvelle session. |
-| Fenêtre PowerShell se ferme | Lance `npm start` depuis un terminal déjà ouvert pour lire l’erreur. |
-| Dossiers/configuration déplacés | Corrige les chemins dans `bridge/config.json` ; l’installateur conserve ce fichier s’il existe. |
+| OpenCode offline | Make sure `opencode serve` is listening on the port in `serverUrl`; also check server authentication if enabled. |
+| No outgoing messages | Keep the game visible, not minimized, and out of exclusive fullscreen; check that `capture.processName` matches the executable; inspect `bridge/bridge.log`. |
+| Reply slots not installed | Rerun `node setup.js`, fully quit WoW, and enable the slot addons. |
+| Updates have stopped | Run `/oc slots`, then click Reload; `/oc diag` checks the signal channel. |
+| Folder not found | In Folders, enter a Windows path on the PC running the bridge. A WSL path such as `/home/...` is not a Windows path. |
+| Session already busy | Wait for it to finish in the other client, or create a new session. |
+| PowerShell window closes | Run `npm start` from an already-open terminal so you can read the error. |
+| Folders or configuration moved | Correct the paths in `bridge/config.json`; the installer preserves this file if it already exists. |
 
-`npm run test:live`, avec le serveur ouvert, vérifie ses routes et le flux SSE en créant puis supprimant une session temporaire. Il enregistre un message avec `noReply`, sans demander de génération au modèle.
+With the server running, `npm run test:live` checks its routes and SSE stream by creating and then deleting a temporary session. It stores a message with `noReply`, without requesting model inference.
 
-## Validation en jeu à effectuer
+## In-game validation still needed
 
-La capture et le rendu nécessitent une vérification réelle sur ta version de Forever : ouvrir un dossier avec espaces, envoyer un prompt, minimiser et recevoir une notification, répondre à une permission, arrêter une tâche, puis faire `/reload` pendant une génération et retrouver la réponse. Les tests automatisés simulent les API WoW ; ils ne remplacent pas cette vérification.
+Screen capture and rendering need to be checked on your actual Forever build: open a folder with spaces in its name, send a prompt, minimize the window and receive a notification, respond to a permission request, stop a task, then run `/reload` during generation and retrieve the reply. Automated tests simulate the WoW APIs; they do not replace this check.

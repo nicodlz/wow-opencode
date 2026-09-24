@@ -54,7 +54,7 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
   assert.equal(state().controls[`abc:${id}`].items[0].value, sessionID);
   id = await send('hello', undefined, folder);
   await wait(() => state().live?.['abc:c1']?.status === 'done');
-  assert.match(state().live['abc:c1'].text, /Bonjour/);
+  assert.match(state().live['abc:c1'].text, /Hello/);
   api.onPrompt = sid => { api.sessions.get(sid).permission = { id: 'per_1', sessionID: sid, permission: 'bash', patterns: ['npm test'] }; };
   await send('test', undefined, folder);
   await wait(() => state().live?.['abc:c1']?.request?.id === 'per_1');

@@ -8,7 +8,7 @@ async function mockOpenCode(t) {
   let sequence = 0;
   const api = { sessions, calls, onPrompt: null };
   api.emit = event => { for (const stream of streams) stream.write('data: ' + JSON.stringify(event) + '\n\n'); };
-  api.complete = (id, text = 'Bonjour depuis OpenCode ✓') => {
+  api.complete = (id, text = 'Hello from OpenCode ✓') => {
     const s = sessions.get(id);
     s.busy = false; s.permission = null; s.question = null;
     const info = { id: 'msg_answer' + (++sequence), sessionID: id, role: 'assistant', time: { created: Date.now(), completed: Date.now() } };

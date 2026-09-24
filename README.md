@@ -1,34 +1,34 @@
 # WoW OpenCode
 
-Un client **OpenCode dans World of Warcraft: Forever** : ouvre un dossier, crée ou reprends une session, discute avec ton agent pendant que tu joues et reçois ses notifications en jeu.
+An **OpenCode client inside World of Warcraft: Forever**: open a folder, create or resume a session, chat with your agent while you play, and receive notifications in game.
 
-Basé sur [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), sous licence MIT. Le transport spécifique à WoW, le chat, les liens d’objets et les notifications proviennent de ce projet. Le backend a été remplacé par l’API HTTP/SSE d’OpenCode.
+Based on [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), licensed under MIT. The WoW-specific transport, chat, item links, and notifications come from that project. The backend has been replaced with OpenCode's HTTP/SSE API.
 
-## Fonctionnalités
+## Features
 
-- **Folders** : navigateur de dossiers avec chemin saisissable, dossier parent, pagination et dossiers récents.
-- **Sessions** : retrouve les sessions OpenCode du dossier et importe leur conversation.
-- **+ New session** : crée une session persistante dans le dossier courant.
-- Plusieurs projets et sessions en parallèle, brouillon propre à chaque conversation.
-- Texte et activité des outils actualisés pendant la génération ; reconnexion du flux et reprise après redémarrage du bridge sans renvoyer le prompt.
-- **Stop** interrompt réellement la session OpenCode.
-- Permissions **Allow once / Reject** et réponses aux questions depuis le jeu.
-- Notifications : son de chuchotement, écho dans le chat, liens cliquables, compteur de non-lus et barre réduite.
-- `/ai` et `/r`, liens d’objets/sorts/quêtes par Shift-clic, contexte du personnage optionnel.
-- Compteur de slots, bouton Reload avant épuisement et **aucun reload automatique par défaut**.
+- **Folders**: folder browser with an editable path, parent-folder navigation, pagination, and recent folders.
+- **Sessions**: find OpenCode sessions in the current folder and import their conversations.
+- **+ New session**: create a persistent session in the current folder.
+- Multiple projects and sessions running in parallel, with a separate draft for each conversation.
+- Live text and tool activity during generation; stream reconnection and recovery after a bridge restart without resending the prompt.
+- **Stop** actually interrupts the OpenCode session.
+- **Allow once / Reject** permissions and answers to questions directly from the game.
+- Notifications: whisper sound, chat echo, clickable links, unread counts, and a minimized bar.
+- `/ai` and `/r`, Shift-click item/spell/quest links, and optional character context.
+- Slot counter, a Reload button before the pool runs out, and **no automatic reload by default**.
 
-## Prérequis
+## Requirements
 
-- **Windows**, avec WoW Forever en mode **fenêtré ou sans bordure**, visible à l’écran.
-- **Node.js 22.2+**, **Git** et **OpenCode** installés sur ce PC.
-- Un fournisseur connecté dans OpenCode et un modèle fonctionnel. Vérifie d’abord qu’une conversation fonctionne avec `opencode` dans un terminal.
-- Le transport amont cible Forever **TOC 16001**, testé par son auteur sur le client **1.60.1.69913**.
+- **Windows**, with WoW Forever running in **windowed or borderless mode**, visible on screen.
+- **Node.js 22.2+**, **Git**, and **OpenCode** installed on that PC.
+- A connected provider and a working model in OpenCode. First check that you can have a conversation by running `opencode` in a terminal.
+- The upstream transport targets Forever **TOC 16001**, tested by its author on client **1.60.1.69913**.
 
-Cette version a des tests automatisés du Lua, du bridge et du protocole, ainsi qu’un test de l’API d’un vrai serveur **OpenCode 1.18.32**. La validation visuelle et de la capture sur un client WoW Forever réel reste à faire. Il s’agit d’une première version à tester en jeu.
+This version includes automated Lua, bridge, and protocol tests, plus an API smoke test against a real **OpenCode 1.18.32** server. Visual and screen-capture validation on a real WoW Forever client is still pending. This is an initial version ready for in-game testing.
 
 ## Installation
 
-Dans **PowerShell** :
+In **PowerShell**:
 
 ```powershell
 git clone https://github.com/nicodlz/wow-opencode.git
@@ -36,104 +36,104 @@ cd wow-opencode
 npm ci
 ```
 
-Si OpenCode n’est pas encore installé :
+If OpenCode is not installed yet:
 
 ```powershell
 npm install -g opencode-ai
 opencode
 ```
 
-Connecte ton fournisseur dans OpenCode (`/connect`) et sélectionne un modèle (`/models`). Quitte ensuite OpenCode.
+Connect your provider in OpenCode (`/connect`) and select a model (`/models`). Then exit OpenCode.
 
-### 1. Installer l’addon
+### 1. Install the addon
 
-Adapte ces deux chemins : `--wow` est le dossier qui contient **WowB.exe et Interface**, `--project` est ton dossier de travail initial.
+Adjust these two paths: `--wow` is the folder containing **WowB.exe and Interface**; `--project` is your initial working folder.
 
 ```powershell
-node setup.js --wow "C:\Games\World of Warcraft\_forever_" --project "C:\dev\mon-projet"
+node setup.js --wow "C:\Games\World of Warcraft\_forever_" --project "C:\dev\my-project"
 ```
 
-Le client Forever peut aussi se trouver dans `_classic_beta_`. Le programme peut essayer de le trouver si tu omets `--wow`. S’il y a plusieurs comptes, ajoute `--account "TON_COMPTE"`.
+The Forever client may also be in `_classic_beta_`. The installer can try to find it if you omit `--wow`. If you have multiple accounts, add `--account "YOUR_ACCOUNT"`.
 
-L’installation copie l’addon, crée `bridge/config.json` et prépare les **200 addons de réception** et leurs fichiers de signal. Les milliers de petits fichiers sont normaux.
+Installation copies the addon, creates `bridge/config.json`, and prepares the **200 reply-slot addons** and their signal files. Thousands of small files are expected.
 
-**Quitte complètement WoW puis relance-le.** Un simple `/reload` ne suffit pas lors de la première installation. Active **WoW OpenCode** et laisse ses addons « slot » activés.
+**Fully quit and relaunch WoW.** A simple `/reload` is not enough for the first installation. Enable **WoW OpenCode** and leave its slot addons enabled.
 
-### 2. Démarrer OpenCode
+### 2. Start OpenCode
 
-Dans un premier terminal :
+In a first terminal:
 
 ```powershell
 opencode serve --hostname 127.0.0.1 --port 4096
 ```
 
-### 3. Démarrer le bridge
+### 3. Start the bridge
 
-Dans un second terminal, dans le dossier `wow-opencode` :
+In a second terminal, inside the `wow-opencode` folder:
 
 ```powershell
 npm start
 ```
 
-Garde les deux terminaux ouverts pendant que tu joues. `bridge\start-window.cmd` ouvre aussi le bridge dans sa propre fenêtre. Le bridge se relance s’il plante.
+Keep both terminals open while you play. `bridge\start-window.cmd` also opens the bridge in its own window. The bridge restarts if it crashes.
 
-### 4. Dans WoW
+### 4. In WoW
 
-1. Tape **`/oc`**, puis clique **Connect**.
-2. Clique **Folders**, navigue ou colle un chemin, puis **Open this folder**.
-3. Une session est créée. Écris en bas et appuie sur **Entrée**. **Shift+Entrée** ajoute une ligne.
-4. **Sessions** permet de reprendre une conversation existante du dossier ; **+ New session** en ouvre une autre.
-5. Réduis la fenêtre avec **Échap** ou le bouton en haut à droite. Tu seras notifié quand OpenCode répond ou attend ton intervention.
+1. Type **`/oc`**, then click **Connect**.
+2. Click **Folders**, browse or paste a path, then click **Open this folder**.
+3. A session is created. Type in the input box and press **Enter**. **Shift+Enter** adds a new line.
+4. **Sessions** resumes an existing conversation in the folder; **+ New session** starts another one.
+5. Minimize the window with **Esc** or the button in the top-right corner. You will be notified when OpenCode replies or needs your input.
 
-Les dossiers sont ceux du PC sur lequel tournent le bridge et OpenCode. Cette version vise un serveur OpenCode local avec les mêmes chemins que le bridge.
+Folders belong to the PC running the bridge and OpenCode. This version targets a local OpenCode server that uses the same paths as the bridge.
 
-## Commandes utiles
+## Useful commands
 
-| Commande | Action |
+| Command | Action |
 |---|---|
-| `/oc` ou `/wow-opencode` | Ouvrir/réduire la fenêtre |
-| `/oc folders` | Parcourir les dossiers |
-| `/oc sessions` | Reprendre une session OpenCode du dossier |
-| `/oc new [nom]` | Nouvelle session |
-| `/oc cd <chemin>` | Changer le dossier du chat actuel ; le prochain message commence une nouvelle session |
-| `/ai <message>` | Envoyer depuis le chat normal |
-| `/r <message>` | Répondre à OpenCode s’il est le dernier à t’avoir écrit |
-| `/oc cancel` | Interrompre la tâche en cours |
-| `/oc echo short` | Notifications courtes dans le chat (`full`, `off` ou nombre de caractères possibles) |
-| `/oc context off` | Ne plus envoyer le contexte du personnage |
-| `/oc slots` | Voir la réserve de réception |
-| `/oc reload` | Renouveler les slots ; les sessions OpenCode continuent |
-| `/oc help` | Toutes les commandes |
+| `/oc` or `/wow-opencode` | Open/minimize the window |
+| `/oc folders` | Browse folders |
+| `/oc sessions` | Resume an OpenCode session in the folder |
+| `/oc new [name]` | Create a new session |
+| `/oc cd <path>` | Change the current chat's folder; the next message starts a new session |
+| `/ai <message>` | Send from the regular game chat |
+| `/r <message>` | Reply to OpenCode if it was the last to message you |
+| `/oc cancel` | Interrupt the current task |
+| `/oc echo short` | Short chat notifications (`full`, `off`, or a character count also work) |
+| `/oc context off` | Stop sending character context |
+| `/oc slots` | Show the remaining reply slots |
+| `/oc reload` | Replenish the slot pool; OpenCode sessions keep running |
+| `/oc help` | List all commands |
 
-Une question OpenCode se répond dans le champ de saisie : numéro d’option ou texte libre, **une ligne par question**. Pour un choix multiple, sépare les numéros par des virgules. **Reject** refuse la question. Une autorisation est accordée pour **cette demande uniquement** ; les permissions habituelles restent gérées par OpenCode.
+Answer an OpenCode question in the input box using an option number or free text, with **one line per question**. For multiple-choice questions, separate option numbers with commas. **Reject** dismisses the question. Permission is granted for **that request only**; OpenCode continues to manage your usual permission rules.
 
-## Temps réel et limites de WoW
+## Real-time updates and WoW limitations
 
-Un addon WoW ne peut pas ouvrir de socket HTTP. Le bridge reçoit les événements OpenCode en SSE, puis les transmet par le transport de `wow-claude` : **pixels à l’écran en sortie**, **addons chargés à la demande en entrée**.
+A WoW addon cannot open an HTTP connection. The bridge receives OpenCode events over SSE, then relays them through the `wow-claude` transport: **on-screen pixels for outgoing messages**, **load-on-demand addons for incoming updates**.
 
-- Mises à jour en jeu environ **toutes les 3–4 secondes** avec la fenêtre ouverte, **10 secondes** en arrière-plan ; les réponses finales disposent aussi d’un signal rapide.
-- **200 réceptions par session d’interface**, partagées entre tous les chats. Une réception contient l’état de tous les chats. Les 20 derniers slots sont économisés avec un intervalle plus long.
-- Clique **Reload** quand la réserve est basse. Les conversations et tâches OpenCode restent sur le serveur ; l’interface les retrouve ensuite. Il n’y a pas de streaming illimité sans reload.
-- 16 conversations ouvertes dans l’addon, 3 tâches simultanées par défaut. Les tâches supplémentaires attendent leur tour.
-- Une session déjà en cours dans un autre client ne peut pas être reprise tant qu’elle n’est pas au repos. Les nouvelles tâches lancées depuis un autre client ne sont pas surveillées automatiquement par cet addon.
-- La capture nécessite que le jeu reste visible. Le plein écran exclusif et un jeu minimisé ne conviennent pas.
+- In-game updates arrive roughly **every 3–4 seconds** while the window is open, or **every 10 seconds** in the background; final replies also have a fast readiness signal.
+- **200 slot reads per UI session**, shared across all chats. Each read contains the state of every chat. The last 20 slots are conserved by using a longer polling interval.
+- Click **Reload** when the pool is running low. OpenCode conversations and tasks remain on the server and are picked up again by the UI. Unlimited streaming without a reload is not possible.
+- Up to 16 chats open in the addon, with 3 concurrent tasks by default. Additional tasks are queued.
+- A session running in another client cannot be attached until it is idle. New tasks launched from another client are not automatically monitored by this addon.
+- Screen capture requires the game to remain visible. Exclusive fullscreen and a minimized game are not supported.
 
-Pour conserver la compatibilité du transport amont, les dossiers techniques de l’addon, les SavedVariables et certains identifiants Lua portent encore le nom **`WoWClaude`**. L’interface et le backend utilisent OpenCode. N’exécute pas le bridge original en même temps sur cette installation.
+To preserve upstream transport compatibility, the addon's internal folders, SavedVariables, and some Lua identifiers still use the name **`WoWClaude`**. The UI and backend use OpenCode. Do not run the original bridge against this installation at the same time.
 
-## Configuration et dépannage
+## Configuration and troubleshooting
 
-- [Installation Windows détaillée](docs/INSTALL-WINDOWS.md)
+- [Detailed Windows installation guide](docs/INSTALL-WINDOWS.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Contribuer et tester](CONTRIBUTING.md)
+- [Contributing and testing](CONTRIBUTING.md)
 
-Si **Connect** échoue, vérifie `opencode serve`, `npm start`, puis le mode fenêtré et la visibilité de WoW. Si les slots manquent, relance `node setup.js` puis **redémarre complètement le jeu**. Le journal est `bridge/bridge.log`.
+If **Connect** fails, check `opencode serve`, `npm start`, and that WoW is visible in windowed mode. If slots are missing, rerun `node setup.js`, then **fully restart the game**. Logs are in `bridge/bridge.log`.
 
-## Crédits
+## Credits
 
-- [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), base importée depuis le commit `75dd54b588906cb9cd8d7849bfeaec8affe335ee`.
-- [0xInuarashi/wow-forever-codex](https://github.com/0xinuarashi/wow-forever-codex), travaux initiaux sur le transport pixel et le chargement de fichiers dans Forever.
-- [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source), branche `forever`, référence des API du client.
-- [OpenCode](https://opencode.ai), serveur et API de sessions.
+- [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), the base project imported from commit `75dd54b588906cb9cd8d7849bfeaec8affe335ee`.
+- [0xInuarashi/wow-forever-codex](https://github.com/0xinuarashi/wow-forever-codex), pioneering work on pixel transport and file loading in Forever.
+- [Gethe/wow-ui-source](https://github.com/Gethe/wow-ui-source), the `forever` branch, as the client API reference.
+- [OpenCode](https://opencode.ai), the server and session API.
 
-Licence **MIT**, voir [LICENSE](LICENSE). Le screenshot conservé dans `docs/screenshot.jpg` est celui du projet amont, pas une capture de cette version.
+**MIT** license; see [LICENSE](LICENSE). The screenshot retained at `docs/screenshot.jpg` comes from the upstream project and does not show this version.
