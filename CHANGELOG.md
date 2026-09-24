@@ -4,6 +4,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## Unreleased
 
+- Add a per-chat in-game model and reasoning-variant picker backed by connected OpenCode providers, including pagination and existing-session preferences.
 - Browse and validate folders through the OpenCode server API, including Linux paths from a Windows bridge.
 - Resolve relative paths and `~` using the server's working directory and home, and match sessions using the server's path semantics.
 - Support `OPENCODE_SERVER_URL`, authenticated HTTP/SSE with default or custom usernames, and reverse-proxy URL prefixes; report authentication errors explicitly.

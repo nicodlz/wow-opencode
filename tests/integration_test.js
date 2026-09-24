@@ -19,7 +19,15 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
     [home]: [{ name: 'project with spaces', absolute: folder, type: 'directory' }],
     [folder]: [],
   };
-  const api = await mockOpenCode(t, { home, directory: home, directories, password, username, prefix: '/opencode' });
+  const models = Object.fromEntries(Array.from({ length: 12 }, (_, n) => {
+    const id = 'model-' + String(n + 1).padStart(2, '0');
+    return [id, { id, name: 'Model ' + String(n + 1).padStart(2, '0'), variants: n === 11 ? { low: {}, high: {} } : {} }];
+  }));
+  const providers = { all: [
+    { id: 'remote', name: 'Remote AI', models },
+    { id: 'disconnected', name: 'Disconnected', models: { hidden: { id: 'hidden', variants: {} } } },
+  ], connected: ['remote'], default: { remote: 'model-12' } };
+  const api = await mockOpenCode(t, { home, directory: home, directories, password, username, prefix: '/opencode', providers });
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wow-opencode-test-'));
   const addons = path.join(root, 'AddOns');
   fs.mkdirSync(path.join(addons, 'WoWClaude'), { recursive: true });
@@ -47,10 +55,10 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
     while (!condition()) { if (Date.now() > until) throw new Error('Timed out: ' + output); await sleep(20); }
   };
   let seq = 0;
-  const send = async (text, op, cwd = '') => {
+  const send = async (text, op, cwd = '', model, variant = '') => {
     const id = ++seq;
     const hex = s => Buffer.from(s).toString('hex');
-    fs.writeFileSync(config.savedVariablesFile, `WoWClaudeDB = { ["outbox"] = { ["id"] = ${id}, ["session"] = "abc", ["chat"] = "c1", ["text"] = "${hex(text)}", ["cwd"] = "${hex(cwd)}", ${op ? `["op"] = "${op}",` : ''} } }`);
+    fs.writeFileSync(config.savedVariablesFile, `WoWClaudeDB = { ["outbox"] = { ["id"] = ${id}, ["session"] = "abc", ["chat"] = "c1", ["text"] = "${hex(text)}", ["cwd"] = "${hex(cwd)}", ${op ? `["op"] = "${op}",` : ''} ${model !== undefined ? `["model"] = "${hex(model)}", ["variant"] = "${hex(variant)}",` : ''} } }`);
     if (op) await wait(() => state().controls?.[`abc:${id}`]);
     return id;
   };
@@ -64,12 +72,25 @@ test('real bridge: folder/session controls, prompt, permission, question, stop a
   assert.ok(sessionID);
   id = await send('', 'sessions', folder);
   assert.equal(state().controls[`abc:${id}`].items[0].value, sessionID);
-  id = await send('hello', undefined, folder);
+  id = await send('', 'providers', folder);
+  assert.deepEqual(state().controls[`abc:${id}`].items.map(p => p.value), ['remote']);
+  id = await send('remote\n1', 'models', folder);
+  assert.equal(state().controls[`abc:${id}`].pages, 2);
+  assert.equal(state().controls[`abc:${id}`].items.length, 10);
+  id = await send('remote\n2', 'models', folder);
+  assert.equal(state().controls[`abc:${id}`].items.length, 2);
+  id = await send('remote/model-12', 'variants', folder);
+  assert.deepEqual(state().controls[`abc:${id}`].items.map(v => v.value), ['', 'high', 'low']);
+  id = await send('hello', undefined, folder, 'remote/model-12', 'high');
   await wait(() => state().live?.['abc:c1']?.status === 'done');
   assert.match(state().live['abc:c1'].text, /Hello/);
+  assert.deepEqual(api.calls.find(c => c.route.endsWith('/prompt_async')).body.model, { providerID: 'remote', modelID: 'model-12' });
+  assert.equal(api.calls.find(c => c.route.endsWith('/prompt_async')).body.variant, 'high');
   // Reattach using a relative path and import the remote transcript.
   id = await send(sessionID, 'attach', '../project with spaces');
   assert.equal(state().controls[`abc:${id}`].session, sessionID);
+  assert.equal(state().controls[`abc:${id}`].model, 'remote/model-12');
+  assert.equal(state().controls[`abc:${id}`].variant, 'high');
   assert.ok(state().controls[`abc:${id}`].messages.some(m => m.text.includes('Hello from OpenCode')));
   id = await send(home + '/missing', 'open');
   assert.match(state().controls[`abc:${id}`].error, /Folder not found/);

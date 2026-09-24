@@ -45,6 +45,8 @@ npm start
 
 In WoW, using windowed or borderless mode: `/oc` → **Connect** → **Folders** → **Open this folder**. The new session uses OpenCode's model and permissions. **Sessions** resumes an existing conversation, and **Stop** interrupts the current task.
 
+Click **Model: Auto** to pick a connected provider and model, then a reasoning variant supported by that model. Use **Thinking: default** to change the reasoning variant later. These settings are saved per chat and apply to the next message. `/oc model` and `/oc reasoning` open the same selectors.
+
 Right-click a chat for Rename and Folder options. The delete button closes the chat and forgets its local copy; the session remains available in OpenCode and can be resumed through Sessions.
 
 ## Optional global command
@@ -67,7 +69,7 @@ npm ci
 node setup.js --wow "C:\Games\World of Warcraft\_forever_"
 ```
 
-Your existing configuration is preserved; explicitly passing `--server` or `--project` updates those connection settings. Edit `bridge/config.json` if local addon paths have changed. Fully restart WoW if addon files have been added, then restart the bridge. Updating existing Lua files only requires `/reload` after copying them.
+Your existing configuration is preserved; explicitly passing `--server` or `--project` updates those connection settings. Edit `bridge/config.json` if local addon paths have changed. Fully restart WoW if addon files have been added, then restart the bridge. **This update adds `ModelPicker.lua`, so it requires a full game restart.** Updating existing Lua files only requires `/reload` after copying them.
 
 ## Troubleshooting
 

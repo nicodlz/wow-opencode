@@ -38,7 +38,7 @@ function readSlot(src, globalName) {
 test('slot file round-trips replies, denied rules, cwd and a restore bundle', () => {
   const restore = {
     token: 'tok1',
-    chats: [{ id: 'c1', name: 'realms', cwd: 'C:\\x\\y', messages: [
+    chats: [{ id: 'c1', name: 'realms', cwd: 'C:\\x\\y', model: 'remote/model-12', variant: 'high', messages: [
       { role: 'user', id: 1, t: 1, text: 'hi "there"\nnew line' },
       { role: 'claude', id: 1, t: 2, text: 'hello | pipe \\ backslash' },
     ] }],
@@ -54,6 +54,8 @@ test('slot file round-trips replies, denied rules, cwd and a restore bundle', ()
   assert.equal(d.replies[0].text, 'ok\ttab');
   assert.equal(d.restore.token, 'tok1');
   assert.equal(d.restore.chats.length, 1);
+  assert.equal(d.restore.chats[0].model, 'remote/model-12');
+  assert.equal(d.restore.chats[0].variant, 'high');
   assert.equal(d.restore.chats[0].messages[0].text, 'hi "there"\nnew line');
   assert.equal(d.restore.chats[0].messages[1].text, 'hello | pipe \\ backslash');
 });

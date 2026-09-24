@@ -63,6 +63,8 @@ The password is used for all HTTP calls and the SSE stream. It is not written to
 
 Run `/oc` → **Connect** → **Folders**. Enter a Linux path such as `/home/your-user/project` or `~/project`, then choose **Open this folder**. **Sessions** lists sessions in that server folder and lets you resume their history.
 
+**Model: Auto** fetches connected providers and models from the same authenticated server. The **Thinking** selector fetches only that model's available reasoning variants. Changes are saved per WoW chat and affect the next prompt; attaching an OpenCode session restores its model and variant. The first update adding `ModelPicker.lua` needs a **full WoW restart**, even when the bridge runs on another machine.
+
 `~` means the home directory reported by OpenCode, which may differ from the SSH login user's home if OpenCode runs under another account. Relative paths resolve against the configured default server project. Linux paths are case-sensitive, even when entered on Windows.
 
 If an old chat still points to `C:\...` after switching to Linux, open the Linux project through Folders or set `/oc cd /home/your-user/project` in an idle chat. Existing OpenCode sessions can then be selected through Sessions.

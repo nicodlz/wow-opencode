@@ -98,6 +98,8 @@ function parseFlags(flags) {
     else if (tok === 'c') out.context = true;
     else if (tok.startsWith('op=')) out.op = tok.slice(3);
     else if (tok.startsWith('req=')) out.requestID = tok.slice(4);
+    else if (tok.startsWith('model=')) out.model = fromHex(tok.slice(6));
+    else if (tok.startsWith('variant=')) out.variant = fromHex(tok.slice(8));
     else if (tok.startsWith('allow=')) out.allow.push(...tok.slice(6).split(',').map(s => s.trim()).filter(Boolean));
   }
   return out;
@@ -147,6 +149,10 @@ function parseOutbox(src) {
   if (op) job.op = op[1];
   const requestID = b.match(/\["requestID"\]\s*=\s*"([a-zA-Z0-9_]+)"/);
   if (requestID) job.requestID = requestID[1];
+  for (const field of ['model', 'variant']) {
+    const hex = b.match(new RegExp(`\\["${field}"\\]\\s*=\\s*"([0-9a-fA-F]*)"`));
+    if (hex) job[field] = fromHex(hex[1]);
+  }
   return job;
 }
 
@@ -261,7 +267,8 @@ function luaTable(globalName, records, opts = {}) {
   if (restore) {
     lines.push('\trestore = {', `\t\ttoken = ${luaStr(restore.token)},`, '\t\tchats = {');
     for (const c of restore.chats) {
-      lines.push('\t\t\t{', `\t\t\t\tid = ${luaStr(c.id)},`, `\t\t\t\tname = ${luaStr(c.name)},`, `\t\t\t\tcwd = ${luaStr(c.cwd)},`, '\t\t\t\tmessages = {');
+      lines.push('\t\t\t{', `\t\t\t\tid = ${luaStr(c.id)},`, `\t\t\t\tname = ${luaStr(c.name)},`, `\t\t\t\tcwd = ${luaStr(c.cwd)},`,
+        `\t\t\t\tmodel = ${luaStr(c.model || '')},`, `\t\t\t\tvariant = ${luaStr(c.variant || '')},`, '\t\t\t\tmessages = {');
       for (const m of c.messages) {
         lines.push(`\t\t\t\t\t{ role = ${luaStr(m.role)}, id = ${Number(m.id) || 0}, t = ${Number(m.t) || 0}, text = ${luaStr(m.text)} },`);
       }

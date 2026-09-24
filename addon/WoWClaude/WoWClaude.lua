@@ -135,6 +135,9 @@ local function AddChat(name, cwd)
 		id = NewId(),
 		name = name or ("Chat " .. (#db.chats + 1)),
 		cwd = cwd or (current and current.cwd) or DEFAULT_CWD,
+		model = current and current.model or "",
+		variant = current and current.variant or "",
+		modelName = current and current.modelName or nil,
 		history = {},
 		unread = 0,
 		created = time(),
@@ -717,11 +720,13 @@ local function ApplyControlData(data)
 				elseif r.op == "open" or r.op == "attach" then
 					c.cwd, c.sessionID, c.name = r.path, r.session, r.name or c.name
 					c.history, c.resetNext = r.messages or {}, nil
+					if r.op == "attach" then c.model, c.variant, c.modelName = r.model or "", r.variant or "", nil end
 				elseif r.op == "permission" or r.op == "question" then
 					c.request = nil
 				end
 			end
 			if WoWClaude.BrowserResult then WoWClaude.BrowserResult(r) end
+			if WoWClaude.ModelResult then WoWClaude.ModelResult(r) end
 			RefreshStrip()
 		end
 	end
@@ -770,6 +775,8 @@ local function ImportRestore(r)
 				id = rc.id,
 				name = (rc.name and rc.name ~= "") and rc.name or ("Chat " .. (#db.chats + 1)),
 				cwd = rc.cwd or DEFAULT_CWD,
+				model = rc.model or "",
+				variant = rc.variant or "",
 				history = {},
 				unread = 0,
 				created = time(),
@@ -945,6 +952,7 @@ end
 Finish = function(chat, role, text, denied)
 	AddHistory(chat, role, text, chat.pendingId, denied)
 	chat.pendingId = nil
+	chat.pendingModel, chat.pendingVariant = nil, nil
 	chat.progress = nil
 	chat.request = nil
 	if run.act then run.act[chat.id] = nil end
@@ -1227,6 +1235,9 @@ function WoWClaude.Send(text, allow)
 	local tokens = {}
 	if c.resetNext then table.insert(tokens, "n") end
 	if allow and #allow > 0 then table.insert(tokens, "allow=" .. table.concat(allow, ",")) end
+	local selectedModel, selectedVariant = c.model or "", c.variant or ""
+	table.insert(tokens, "model=" .. ToHex(selectedModel))
+	table.insert(tokens, "variant=" .. ToHex(selectedVariant))
 	local flags = table.concat(tokens, ";")
 	local newSession = c.resetNext and true or nil
 	c.resetNext = nil
@@ -1238,9 +1249,12 @@ function WoWClaude.Send(text, allow)
 		cwd = ToHex(c.cwd),
 		ctx = ctx and ToHex(ctx) or nil,
 		newSession = newSession,
+		model = ToHex(selectedModel),
+		variant = ToHex(selectedVariant),
 		t = time(),
 	}
 	c.pendingId = id
+	c.pendingModel, c.pendingVariant = selectedModel, selectedVariant
 	c.draft = nil
 	c.progress = nil
 	AddHistory(c, "user", text, id)
@@ -1333,7 +1347,7 @@ function WoWClaude.Resend()
 		end
 	end
 	if not text then return end
-	run.outbound[c.pendingId] = { chat = c.id, cwd = c.cwd, flags = "", name = c.name, text = text, sentAt = GetTime() }
+	run.outbound[c.pendingId] = { chat = c.id, cwd = c.cwd, flags = "model=" .. ToHex(c.pendingModel or c.model or "") .. ";variant=" .. ToHex(c.pendingVariant or c.variant or ""), name = c.name, text = text, sentAt = GetTime() }
 	run.sentAt = GetTime()
 	run.polls = 0
 	ScheduleNextPoll()
@@ -1420,6 +1434,25 @@ function WoWClaude.SetFolder(rest, c)
 		AddHistory(c, "system", "cwd is the OpenCode server's default: " .. base .. " (/oc cd <folder>, or right-click the chat and pick Folder, to change)")
 	end
 	WoWClaude.Render()
+end
+
+function WoWClaude.ActiveChatId() return db.activeChat end
+function WoWClaude.Chat(id) return FindChat(id) end
+
+function WoWClaude.CurrentModel(chatId)
+	local c = chatId and FindChat(chatId) or ActiveChat()
+	return c and c.model or "", c and c.variant or "", c and c.modelName or ""
+end
+
+function WoWClaude.SelectModel(model, variant, name, chatId)
+	local c = chatId and FindChat(chatId) or ActiveChat()
+	if not c then return end
+	c.model = model or ""
+	c.variant = variant or ""
+	c.modelName = name
+	-- A running prompt already carries its own model/variant snapshot. The new
+	-- selection applies to the next message in this chat, without resetting it.
+	WoWClaude.UpdateStatus()
 end
 
 StaticPopupDialogs["WOWCLAUDE_FOLDER"] = {
@@ -1629,6 +1662,13 @@ function WoWClaude.UpdateStatus()
 	if run.backend and not run.backend.healthy then ui.status:SetText("OpenCode: " .. Display(run.backend.message)) end
 	if c and c.request then ui.status:SetText(c.request.kind == "permission" and "Permission needed — allow once or reject below" or "Answer needed — type an option number or your answer below") end
 	if ui.stop then ui.stop:SetShown(c and c.pendingId ~= nil) end
+	if ui.modelButton then
+		local name = c and (c.modelName or c.model) or ""
+		if name == "" then name = "Auto" end
+		if #name > 21 then name = name:sub(1, 18) .. "..." end
+		ui.modelButton:SetText("Model: " .. Display(name))
+		ui.thinkingButton:SetText("Thinking: " .. Display(c and c.variant ~= "" and c.variant or "default"))
+	end
 	if ui.resend then ui.resend:SetShown(c and c.pendingId ~= nil and mode == "pixel") end
 	if ui.refresh then ui.refresh:SetShown(mode ~= "pixel" or (run.slotsUsed or 0) >= SLOT_COUNT - 20 or run.slotsExhausted or run.slotsMissing or run.pixelFailed or false) end
 	WoWClaude.UpdateMini()
@@ -2419,6 +2459,12 @@ local function BuildUI()
 	stop:SetPoint("LEFT", resend, "RIGHT", 6, 0)
 	stop:Hide()
 	ui.stop = stop
+	local modelButton = MakeButton(f, "Model: Auto", 210, function() WoWClaude.ChooseModel() end)
+	modelButton:SetPoint("LEFT", stop, "RIGHT", 6, 0)
+	ui.modelButton = modelButton
+	local thinkingButton = MakeButton(f, "Thinking: default", 145, function() WoWClaude.ChooseModel("reasoning") end)
+	thinkingButton:SetPoint("LEFT", modelButton, "RIGHT", 6, 0)
+	ui.thinkingButton = thinkingButton
 
 	-- A named, always-present button so a keybinding can click it (see /wow-claude bind).
 	local hotkey = CreateFrame("Button", "WoWClaudeRefreshButton", UIParent)
@@ -2586,6 +2632,8 @@ local HELP = table.concat({
 	"/wow-claude delete                 delete the current chat",
 	"/wow-claude cd <folder>            folder on the OpenCode server (relative to the default project; ~ = server home; no folder = back to default). Right-click the chat and pick Folder to change it",
 	"/wow-claude reset                  next message in this chat starts a fresh Claude session",
+	"/wow-claude model                  choose a model for this chat from the connected OpenCode providers",
+	"/wow-claude reasoning              choose this model's available reasoning variants",
 	"/wow-claude context [on|off]       what Claude is told about your character and where you are (no argument = show it)",
 	"/wow-claude mode pixel             no-reload transport (default)",
 	"/wow-claude mode reload            fallback transport: a /reload per step",
@@ -2637,6 +2685,10 @@ SlashCmdList["WOWCLAUDE"] = function(msg)
 		if WoWClaude.NewChat(rest) then WoWClaude.Control("open", WoWClaude.CurrentFolder()) end
 	elseif cmd == "folders" or cmd == "sessions" then
 		WoWClaude.Browse(cmd, rest ~= "" and rest or nil)
+	elseif cmd == "model" then
+		WoWClaude.ChooseModel()
+	elseif cmd == "reasoning" or cmd == "thinking" then
+		WoWClaude.ChooseModel("reasoning")
 	elseif cmd == "chat" or cmd == "chats" then
 		local n = tonumber(rest)
 		local target = n and db.chats[n]

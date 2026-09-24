@@ -58,7 +58,7 @@ class OpenCode {
 
   // Reconciliation makes SSE loss recoverable, including interactive requests.
   // A persisted messageID is never sent again when recovering a bridge restart.
-  async run({ directory, sessionID, messageID, text, system, model, agent, recover, signal, onUpdate }) {
+  async run({ directory, sessionID, messageID, text, system, model, variant, agent, recover, signal, onUpdate }) {
     const stream = new AbortController();
     const combined = AbortSignal.any([signal, stream.signal]);
     const parts = new Map();
@@ -106,7 +106,7 @@ class OpenCode {
         await this.request(`/session/${sessionID}/prompt_async`, directory, {
           method: 'POST', signal, body: {
             messageID, parts: [{ type: 'text', text }],
-            ...(system ? { system } : {}), ...(model ? { model } : {}), ...(agent ? { agent } : {}),
+            ...(system ? { system } : {}), ...(model ? { model } : {}), ...(variant ? { variant } : {}), ...(agent ? { agent } : {}),
           },
         });
       }

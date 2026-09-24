@@ -34,7 +34,7 @@ function newVM() {
   };
   const num = (expr) => Number(evaluate(expr));
   run(fs.readFileSync(path.join(__dirname, 'wow_stub.lua'), 'utf8'));
-  for (const f of ['Codec.lua', 'Inbox.lua', 'WoWClaude.lua', 'Workspaces.lua']) run(fs.readFileSync(path.join(ADDON, f), 'utf8'), 'WoWClaude');
+  for (const f of ['Codec.lua', 'Inbox.lua', 'WoWClaude.lua', 'Workspaces.lua', 'ModelPicker.lua']) run(fs.readFileSync(path.join(ADDON, f), 'utf8'), 'WoWClaude');
   return { run, evaluate, num };
 }
 
@@ -131,6 +131,67 @@ test('folder browser sends a control, receives paginated folders and opens a per
   assert.equal(vm.evaluate('next(WoWClaudeDB.controls)'), null);
 });
 
+test('model picker discovers connected providers, pages models and saves reasoning per chat', () => {
+  const vm = newVM(); login(vm); connect(vm);
+  const token = vm.evaluate('WoWClaudeDB.session');
+  const chat = vm.evaluate('WoWClaudeDB.chats[1].id');
+  const reply = (op, data) => {
+    const request = stripRecords(vm).find(r => r.flags === 'op=' + op);
+    assert.ok(request, `${op} control sent`);
+    nextSlot(vm, P.luaValue({ now: 1700000000, controls: [{ token, id: request.id, chat, op, ...data }] }));
+    vm.run('STUB.now = STUB.now + 4; STUB.Tick()');
+  };
+  vm.run('WoWOpenCodeModelPicker = nil; WoWOpenCode.ChooseModel()');
+  reply('providers', { items: [{ name: 'Connected', value: 'remote' }] });
+  vm.run('WoWOpenCodeModelPicker.rows[1].scripts.OnClick(WoWOpenCodeModelPicker.rows[1])');
+  assert.equal(stripRecords(vm).find(r => r.flags === 'op=models').text, 'remote\n1');
+  reply('models', { name: 'Connected', provider: 'remote', page: 1, pages: 2, items: Array.from({ length: 10 }, (_, i) => ({ name: 'Model ' + i, value: 'remote/model-' + i })) });
+  vm.run('WoWOpenCodeModelPicker.next.scripts.OnClick()');
+  assert.equal(stripRecords(vm).find(r => r.flags === 'op=models').text, 'remote\n2');
+  reply('models', { name: 'Connected', provider: 'remote', page: 2, pages: 2, items: [{ name: 'Deep', value: 'remote/deep' }] });
+  vm.run('WoWOpenCodeModelPicker.rows[1].scripts.OnClick(WoWOpenCodeModelPicker.rows[1])');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].model'), 'remote/deep');
+  reply('variants', { model: 'remote/deep', name: 'Deep', items: [{ name: 'Default', value: '' }, { name: 'High', value: 'high' }] });
+  vm.run('WoWOpenCodeModelPicker.rows[2].scripts.OnClick(WoWOpenCodeModelPicker.rows[2])');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].variant'), 'high');
+  vm.run('WoWOpenCode.ChooseModel("reasoning")');
+  assert.equal(stripRecords(vm).find(r => r.flags === 'op=variants').text, 'remote/deep');
+  reply('variants', { model: 'remote/deep', name: 'Deep', items: [{ name: 'Default', value: '' }, { name: 'Low', value: 'low' }] });
+  vm.run('WoWOpenCode.NewChat("Other"); WoWOpenCodeModelPicker.rows[2].scripts.OnClick(WoWOpenCodeModelPicker.rows[2])');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].variant'), 'low', 'picker stays scoped to the chat that opened it');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[2].variant'), 'high');
+  vm.run(`WoWOpenCode.SwitchChat(${P.luaStr(chat)})`);
+  vm.run('WoWOpenCode.Send("hello"); WoWOpenCode.NewChat("Second")');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[3].model'), 'remote/deep');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[3].variant'), 'low');
+  vm.run(`WoWOpenCode.SelectModel("", "", nil); WoWOpenCode.SwitchChat(${P.luaStr(chat)})`);
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].variant'), 'low');
+  const prompt = stripRecords(vm).find(r => r.text === 'hello');
+  assert.equal(P.jobsFromStrip(prompt.id, decodeStrip(vm).text).find(r => r.text === 'hello').model, 'remote/deep');
+  assert.equal(P.jobsFromStrip(prompt.id, decodeStrip(vm).text).find(r => r.text === 'hello').variant, 'low');
+});
+
+test('attached sessions import their model/variant; changes during a run only affect the next message', () => {
+  const vm = newVM(); login(vm); connect(vm);
+  vm.run('WoWOpenCode.Control("attach", "ses_external")');
+  const control = stripRecords(vm).find(r => r.flags === 'op=attach');
+  const token = vm.evaluate('WoWClaudeDB.session');
+  const chat = vm.evaluate('WoWClaudeDB.chats[1].id');
+  nextSlot(vm, P.luaValue({ now: 1700000000, controls: [{ token, id: control.id, chat, op: 'attach', path: '/project', session: 'ses_external', name: 'Existing', model: 'remote/old', variant: 'low', messages: [] }] }));
+  vm.run('STUB.now = STUB.now + 4; STUB.Tick()');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].model'), 'remote/old');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].variant'), 'low');
+  vm.run('WoWOpenCode.Send("check"); WoWOpenCode.SelectModel("remote/new", "high", "New")');
+  assert.equal(vm.evaluate('WoWClaudeDB.chats[1].pendingModel'), 'remote/old');
+  vm.run('WoWOpenCode.Resend()');
+  const rec = stripRecords(vm).find(r => r.text === 'check');
+  assert.equal(P.jobsFromStrip(rec.id, decodeStrip(vm).text).find(r => r.text === 'check').model, 'remote/old');
+  assert.equal(P.jobsFromStrip(rec.id, decodeStrip(vm).text).find(r => r.text === 'check').variant, 'low');
+  nextSlot(vm, P.luaValue({ now: 1700000000, replies: [{ id: rec.id, chat, status: 'done', text: 'done' }] }));
+  vm.run('STUB.now = STUB.now + 6; STUB.Tick(); WoWOpenCode.Send("next")');
+  assert.equal(P.jobsFromStrip(0, decodeStrip(vm).text).find(r => r.text === 'next').model, 'remote/new');
+});
+
 test('live permissions notify once and respond without creating a second prompt', () => {
   const vm = newVM(); login(vm); connect(vm);
   vm.run('WoWOpenCode.Send("run tests"); WoWOpenCode.Minimize(true)');
@@ -213,14 +274,14 @@ test('the game context describes the character and rides on the hello, then only
   assert.equal(vm.evaluate('WoWClaude.IsConnected()'), 'true');
   vm.run('WoWClaude.Send("hello world")');
   let rec = stripRecords(vm).find(r => r.text === 'hello world');
-  assert.equal(rec.flags, '', 'unchanged context is not repeated');
+  assert.equal(rec.flags, 'model=;variant=', 'unchanged context is not repeated');
   assert.equal(rec.ctx, undefined);
   assert.equal(vm.evaluate('WoWClaudeDB.outbox.ctx'), null);
   // Moving to another zone changes it, so the next message (from another chat,
   // the first one is still waiting) carries the new version.
   vm.run('STUB.zone = "Elwynn Forest"; STUB.subzone = ""; STUB.posX = 0.1; WoWClaude.NewChat("Second"); WoWClaude.Send("where am I")');
   rec = stripRecords(vm).find(r => r.text === 'where am I');
-  assert.equal(rec.flags, 'c');
+  assert.equal(rec.flags, 'model=;variant=;c');
   assert.ok(rec.ctx.includes('Location: Elwynn Forest\n'), rec.ctx);
   assert.ok(rec.ctx.includes('Position: 10.0, 67.8 on Duskwood (map 1431)'), 'the map name shows when it differs from the zone');
   assert.equal(Buffer.from(vm.evaluate('WoWClaudeDB.outbox.ctx'), 'hex').toString('utf8'), rec.ctx, 'the reload path carries it too');
@@ -418,7 +479,7 @@ test('a sent message is encoded on the strip with the chat folder, then a slot r
   assert.equal(rec.chat, chatId);
   assert.equal(rec.id, id);
   assert.equal(rec.cwd, 'realms');
-  assert.equal(rec.flags, '');
+  assert.equal(rec.flags, 'model=;variant=');
   // The chat took its title from the first message.
   assert.equal(vm.evaluate('WoWClaudeDB.chats[1].name'), 'Hello world');
 
@@ -449,7 +510,7 @@ test('a denied reply shows Allow, and Allow resends with the rules as flags', ()
   vm.run(`WoWClaude.Allow("${chatId}", { "WebSearch", "Bash(cargo:*)" })`);
   const rec = stripRecords(vm).find(r => r.flags.includes('allow='));
   assert.ok(rec, 'allow record on the strip');
-  assert.equal(rec.flags, 'allow=WebSearch,Bash(cargo:*)');
+  assert.equal(rec.flags, 'allow=WebSearch,Bash(cargo:*);model=;variant=');
   assert.equal(rec.id, id + 1);
 });
 
@@ -460,7 +521,7 @@ test('/wow-claude reset marks the next message as a new session', () => {
   vm.run('SlashCmdList.WOWCLAUDE("reset")');
   vm.run('WoWClaude.Send("start over")');
   const rec = stripRecords(vm).find(r => r.text === 'start over');
-  assert.equal(rec.flags, 'n');
+  assert.equal(rec.flags, 'n;model=;variant=');
   assert.equal(vm.evaluate('WoWClaudeDB.chats[1].resetNext'), null);
 });
 

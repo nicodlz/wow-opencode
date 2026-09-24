@@ -35,6 +35,8 @@ Each WoW chat has a persistent mapping to an OpenCode session and a folder. Chan
 
 `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME` supply Basic authentication for HTTP and SSE. `OPENCODE_SERVER_URL` overrides the configured URL; reverse-proxy path prefixes are preserved.
 
+`bridge/models.js` reads `/provider` scoped to the active server folder, filters to connected providers, paginates model IDs and returns each model's actual `variants`. The Lua model picker sends small controls (`providers`, `models`, `variants`) rather than the entire catalog through a reply slot. The selected model and variant are snapshotted in the outgoing prompt flags (and SavedVariables fallback); the bridge passes them as `model: { providerID, modelID }` and top-level `variant` to `prompt_async`. An in-flight prompt keeps its selection even if the user changes it for the next prompt. Attached sessions expose their model and variant to the game, and bridge-side transcript restore includes per-chat selections.
+
 The bridge saves the `messageID` **before** sending. After a restart, it finds that message and monitors its response without executing the prompt again. If the crash occurred before OpenCode accepted the message, an explicit error asks the user to resend it. Persisted data is written using atomic file replacement.
 
 ## Control protocol
@@ -55,6 +57,7 @@ All text is escaped as Lua string literals; model data is never executed as Lua 
 
 - `WoWClaude.lua`: chat, drafts, controls, transport status, permissions, questions, notifications, and `/oc` commands.
 - `Workspaces.lua`: paginated browser, manual path entry, parent folder, recent folders, and session resumption.
+- `ModelPicker.lua`: connected provider/model browser, model pagination, per-model reasoning variants, and per-chat selection.
 - Each chat has its own draft; scrolling follows new messages only when the reader is already at the bottom.
 - The pool is shared: a single slot load receives the state of every chat.
 - Updates are spaced 3–4 seconds apart in the foreground, 10 seconds in the background, and roughly 15–16 seconds when fewer than 20 slots remain. The user chooses when to reload the UI.

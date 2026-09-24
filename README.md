@@ -9,6 +9,7 @@ Based on [chelinho139/wow-claude](https://github.com/chelinho139/wow-claude), li
 - **Folders**: folder browser with an editable path, parent-folder navigation, pagination, and recent folders.
 - Local or remote OpenCode servers, including Linux: folders are read through the server API, and `~` refers to the server account's home.
 - **Sessions**: find OpenCode sessions in the current folder and import their conversations.
+- **Model** and **Thinking** buttons: choose among connected OpenCode providers/models and the reasoning variants actually offered by the selected model, separately for each chat.
 - **+ New session**: create a persistent session in the current folder.
 - Multiple projects and sessions running in parallel, with a separate draft for each conversation.
 - Live text and tool activity during generation; stream reconnection and recovery after a bridge restart without resending the prompt.
@@ -84,7 +85,8 @@ Keep both terminals open while you play. `bridge\start-window.cmd` also opens th
 2. Click **Folders**, browse or paste a path, then click **Open this folder**.
 3. A session is created. Type in the input box and press **Enter**. **Shift+Enter** adds a new line.
 4. **Sessions** resumes an existing conversation in the folder; **+ New session** starts another one.
-5. Minimize the window with **Esc** or the button in the top-right corner. You will be notified when OpenCode replies or needs your input.
+5. Click **Model: Auto** to choose a model and a reasoning variant. Click **Thinking: default** later to change only the variant. You can also use `/oc model` and `/oc reasoning`.
+6. Minimize the window with **Esc** or the button in the top-right corner. You will be notified when OpenCode replies or needs your input.
 
 Folders always belong to the **OpenCode server**. The bridge uses `/path` and `/file` to resolve and browse them. A Windows bridge connected to Linux keeps `/home/...` paths intact and resolves `~` to the Linux account's home. Addon files and screen capture remain on the Windows game PC.
 
@@ -110,6 +112,8 @@ The same credentials are used for HTTP requests and the SSE stream. You can also
 | `/oc` or `/wow-opencode` | Open/minimize the window |
 | `/oc folders` | Browse folders |
 | `/oc sessions` | Resume an OpenCode session in the folder |
+| `/oc model` | Browse connected providers and select a model for the current chat |
+| `/oc reasoning` | Select one of the current model's available reasoning variants (`/oc thinking` also works) |
 | `/oc new [name]` | Create a new session |
 | `/oc cd <path>` | Change the current chat's folder; the next message starts a new session |
 | `/ai <message>` | Send from the regular game chat |
@@ -122,6 +126,8 @@ The same credentials are used for HTTP requests and the SSE stream. You can also
 | `/oc help` | List all commands |
 
 Answer an OpenCode question in the input box using an option number or free text, with **one line per question**. For multiple-choice questions, separate option numbers with commas. **Reject** dismisses the question. Permission is granted for **that request only**; OpenCode continues to manage your usual permission rules.
+
+Model and reasoning selections are **per chat**. A change made while a reply is running applies to the **next** prompt. New chats inherit the current chat's selection; attaching an existing OpenCode session picks up its model and variant. **Use OpenCode default** clears the per-chat override. Models without reasoning variants show only **Default**. The model browser lists providers that are connected on the server, paginating large catalogs.
 
 ## Real-time updates and WoW limitations
 
@@ -145,6 +151,8 @@ To preserve upstream transport compatibility, the addon's internal folders, Save
 - [Contributing and testing](CONTRIBUTING.md)
 
 If **Connect** fails, check `opencode serve`, `npm start`, and that WoW is visible in windowed mode. If slots are missing, rerun `node setup.js`, then **fully restart the game**. Logs are in `bridge/bridge.log`.
+
+**Updating an existing installation to use Model/Thinking:** run `git pull --ff-only`, `npm ci`, then `node setup.js --wow "<your WoW client folder>"`. **Fully quit and restart WoW**, because `ModelPicker.lua` is a new addon file; `/reload` alone cannot discover it. Restart the bridge as well.
 
 ## Credits
 

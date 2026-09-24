@@ -44,6 +44,7 @@ async function mockOpenCode(t, options = {}) {
       streams.add(res); res.on('close', () => streams.delete(res)); return;
     }
     if (url.pathname === '/global/health') return json({ healthy: true, version: 'mock' });
+    if (url.pathname === '/provider') return json(options.providers || { all: [], connected: [], default: {} });
     if (url.pathname === '/session/status') return json(Object.fromEntries([...sessions].filter(([, s]) => s.busy).map(([id]) => [id, { type: 'busy' }])));
     if (url.pathname === '/permission') return json([...sessions.values()].flatMap(s => s.permission ? [s.permission] : []));
     if (url.pathname === '/question') return json([...sessions.values()].flatMap(s => s.question ? [s.question] : []));
@@ -60,7 +61,8 @@ async function mockOpenCode(t, options = {}) {
       if (!action) return json(s.info);
       if (action === 'message') return json(s.messages);
       if (action === 'prompt_async') {
-        s.messages.push({ info: { id: body.messageID, sessionID: id, role: 'user', time: { created: Date.now() } }, parts: body.parts });
+        s.messages.push({ info: { id: body.messageID, sessionID: id, role: 'user', model: body.model && { ...body.model, variant: body.variant }, time: { created: Date.now() } }, parts: body.parts });
+        if (body.model) s.info.model = { id: body.model.modelID, providerID: body.model.providerID, variant: body.variant || 'default' };
         s.busy = true;
         res.writeHead(204); res.end();
         if (api.onPrompt) api.onPrompt(id, body);

@@ -35,6 +35,10 @@ async function main() {
   const workspace = new ServerWorkspace(client, process.env.WOW_OPENCODE_PROJECT || '');
   await workspace.initialize();
   const directory = await workspace.directory('');
+  const { ModelCatalog } = require('../bridge/models');
+  const catalog = new ModelCatalog(client);
+  const providers = await catalog.providers(directory);
+  console.log('Connected providers:', providers.length);
   const listing = await workspace.folders(directory);
   assert.equal(listing.path, directory);
   assert.ok(Array.isArray(listing.items));
@@ -47,13 +51,27 @@ async function main() {
     assert.ok(sessions.some(s => s.id === session.id));
     assert.ok(Array.isArray(await client.request(`/session/${session.id}/message`, directory)));
     const id = messageID();
+    const provider = providers.find(p => p.count > 0);
+    const selected = provider && (await catalog.models(directory, provider.value)).items[0];
+    const variants = selected && await catalog.variants(directory, selected.value);
+    const variant = variants?.items.find(v => v.value !== '')?.value;
+    const model = selected && { providerID: provider.value, modelID: selected.value.slice(provider.value.length + 1) };
     await client.request(`/session/${session.id}/prompt_async`, directory, { method: 'POST', body: {
       messageID: id, noReply: true, parts: [{ type: 'text', text: 'Transport smoke test; no model response requested.' }],
+      ...(model ? { model } : {}), ...(variant ? { variant } : {}),
     } });
     let stored = false;
     for (let i = 0; i < 40; i++) {
       const messages = await client.request(`/session/${session.id}/message`, directory);
-      if (messages.some(m => m.info.id === id)) { stored = true; break; }
+      const sent = messages.find(m => m.info.id === id);
+      if (sent) {
+        if (model) {
+          assert.equal(sent.info.model.providerID, model.providerID);
+          assert.equal(sent.info.model.modelID, model.modelID);
+          if (variant) assert.equal(sent.info.model.variant, variant);
+        }
+        stored = true; break;
+      }
       await sleep(250);
     }
     assert.ok(stored, 'prompt_async accepts our generated messageID and persists the message');
@@ -70,7 +88,7 @@ async function main() {
     } catch (error) { if (!controller.signal.aborted) throw error; }
     finally { clearTimeout(timer); }
     assert.ok(connected, 'SSE connection established');
-    console.log('PASS: real OpenCode authentication, remote paths/folders, sessions, prompt_async (noReply), history, permissions, questions, status and SSE.');
+    console.log('PASS: real OpenCode authentication, remote paths/folders, connected models/variants, sessions, prompt_async (noReply), history, permissions, questions, status and SSE.');
   } finally {
     await client.request(`/session/${session.id}`, directory, { method: 'DELETE' });
   }

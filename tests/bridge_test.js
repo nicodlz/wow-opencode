@@ -20,6 +20,8 @@ test('parseFlags reads new-session, hello, forget, context and allow lists', () 
   assert.deepEqual(P.parseFlags('d'), { ...none, forget: true });
   assert.deepEqual(P.parseFlags('h;c'), { ...none, hello: true, context: true });
   assert.deepEqual(P.parseFlags('n;allow=WebSearch, Bash(git:*),'), { ...none, newSession: true, allow: ['WebSearch', 'Bash(git:*)'] });
+  assert.deepEqual(P.parseFlags('model=' + Buffer.from('remote/gpt-5').toString('hex') + ';variant=' + Buffer.from('high').toString('hex')),
+    { ...none, model: 'remote/gpt-5', variant: 'high' });
 });
 
 test('jobsFromStrip parses the current record format and keeps separators inside text', () => {
@@ -91,6 +93,9 @@ test('parseOutbox decodes the SavedVariables fallback', () => {
   assert.deepEqual(P.parseOutbox(src), { id: 7, session: 'abc123', chat: 'c1', text: 'héllo', cwd: 'realms', newSession: true, via: 'reload' });
   const withCtx = src.replace('["newSession"]', `["ctx"] = "${hex('Character: Testchar')}",\n["newSession"]`);
   assert.equal(P.parseOutbox(withCtx).ctx, 'Character: Testchar');
+  const withModel = src.replace('["newSession"]', `["model"] = "${hex('remote/gpt-5')}", ["variant"] = "${hex('high')}", ["newSession"]`);
+  assert.equal(P.parseOutbox(withModel).model, 'remote/gpt-5');
+  assert.equal(P.parseOutbox(withModel).variant, 'high');
   assert.equal(P.parseOutbox('WoWClaudeDB = {}'), null);
   assert.equal(P.parseOutbox('["outbox"] = { ["text"] = "" }'), null);
 });

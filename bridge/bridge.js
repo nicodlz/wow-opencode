@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 const P = require('./protocol');
 const { OpenCode, messageID } = require('./opencode');
 const { ServerWorkspace } = require('./workspace');
+const { ModelCatalog } = require('./models');
 
 const HERE = __dirname;
 const ROOT = path.dirname(HERE);
@@ -29,6 +30,7 @@ let cwd = '';
 const slots = cfg.slots || 200;
 const client = new OpenCode(cfg);
 const workspace = new ServerWorkspace(client, arg('--project') || process.env.WOW_OPENCODE_PROJECT || cfg.defaultCwd || '');
+const catalog = new ModelCatalog(client);
 const once = argv.includes('--once');
 const inject = arg('--inject');
 const exitWhenIdle = once || inject !== undefined;
@@ -112,6 +114,7 @@ function note(job, role, text) {
   const chat = transcripts.chats[job.chat] ||= { id: job.chat, name: job.name || '', cwd: job.cwd, messages: [] };
   chat.cwd = job.cwd;
   if (job.name) chat.name = job.name;
+  if (job.model !== undefined) { chat.model = job.model; chat.variant = job.variant || ''; }
   chat.messages.push({ role, text: String(text).slice(0, 24000), id: job.id, t: Math.floor(Date.now() / 1000) });
   chat.messages = chat.messages.slice(-200);
   chat.updated = Date.now();
@@ -152,6 +155,13 @@ async function control(job) {
       result.path = dir;
       result.items = (await client.request('/session', dir)).filter(s => !s.parentID && !s.time?.archived && workspace.same(s.directory, dir))
         .sort((a, b) => b.time.updated - a.time.updated).map(s => ({ name: s.title || s.id, value: s.id }));
+    } else if (job.op === 'providers') {
+      result.items = await catalog.providers(dir);
+    } else if (job.op === 'models') {
+      const [providerID, page] = job.text.split('\n');
+      Object.assign(result, await catalog.models(dir, providerID, Number(page || 1)));
+    } else if (job.op === 'variants') {
+      Object.assign(result, await catalog.variants(dir, job.text));
     } else if (job.op === 'open' || job.op === 'attach') {
       if (Object.values(state.jobs).some(j => j.chat === job.chat)) throw new Error('Stop the current session before switching folders or sessions.');
       const target = job.op === 'open' ? await workspace.directory(job.text) : dir;
@@ -166,11 +176,18 @@ async function control(job) {
       state.sessionCwd[skey] = target;
       result.path = target; result.session = session.id; result.name = session.title;
       const messages = job.op === 'attach' ? await client.request(`/session/${session.id}/message`, target) : [];
+      const lastUser = messages.findLast(m => m.info.role === 'user');
+      const selected = session.model || (lastUser?.info.model && { providerID: lastUser.info.model.providerID, id: lastUser.info.model.modelID, variant: lastUser.info.model.variant });
+      if (job.op === 'attach') {
+        result.model = selected?.providerID && selected?.id ? `${selected.providerID}/${selected.id}` : '';
+        result.variant = selected?.variant === 'default' ? '' : (selected?.variant || '');
+      }
       result.messages = messages.filter(m => ['user', 'assistant'].includes(m.info.role)).slice(-80).map(m => ({
         role: m.info.role === 'assistant' ? 'claude' : 'user', text: m.parts.filter(p => p.type === 'text').map(p => p.text).join('\n'),
         t: Math.floor(m.info.time.created / 1000),
       }));
-      transcripts.chats[job.chat] = { id: job.chat, name: result.name, cwd: target, messages: result.messages, updated: Date.now() };
+      transcripts.chats[job.chat] = { id: job.chat, name: result.name, cwd: target,
+        model: result.model || '', variant: result.variant || '', messages: result.messages, updated: Date.now() };
       saveTranscripts(); remember(target);
     } else if (job.op === 'abort') {
       const pending = Object.values(state.jobs).find(j => j.chat === job.chat);
@@ -294,10 +311,12 @@ async function run(job, controller) {
     let primer = '';
     if (cfg.primerFile) primer = fs.readFileSync(path.resolve(ROOT, cfg.primerFile), 'utf8');
     let model;
-    if (cfg.model) {
-      const slash = cfg.model.indexOf('/');
+    const chosen = job.model || cfg.model;
+    if (chosen) {
+      const slash = chosen.indexOf('/');
       if (slash < 1) throw new Error('model must be provider/model (or empty to use the OpenCode default).');
-      model = { providerID: cfg.model.slice(0, slash), modelID: cfg.model.slice(slash + 1) };
+      if (job.model) await catalog.validate(job.cwd, job.model, job.variant || '');
+      model = { providerID: chosen.slice(0, slash), modelID: chosen.slice(slash + 1) };
     }
     timer = setTimeout(() => {
       client.request(`/session/${job.sessionID}/abort`, job.cwd, { method: 'POST' }).catch(error => log(error.message));
@@ -306,7 +325,8 @@ async function run(job, controller) {
     let lastBeat = 0;
     const text = await client.run({
       directory: job.cwd, sessionID: job.sessionID, messageID: job.messageID, text: job.text,
-      system: P.systemPrompt(cfg.gameContext === false ? '' : state.context, primer), model, agent: cfg.agent,
+      system: P.systemPrompt(cfg.gameContext === false ? '' : state.context, primer), model,
+      variant: job.variant || undefined, agent: cfg.agent,
       recover, signal: controller.signal,
       onUpdate: update => {
         if (Date.now() - lastBeat > 5000) { beat(job); lastBeat = Date.now(); }

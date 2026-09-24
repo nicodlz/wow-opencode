@@ -9,3 +9,4 @@ Codec.lua
 Inbox.lua
 WoWClaude.lua
 Workspaces.lua
+ModelPicker.lua

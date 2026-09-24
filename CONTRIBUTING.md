@@ -16,6 +16,7 @@ Tests cover:
 - The real bridge process with a simulated OpenCode server, filesystem, permission/question responses and restart recovery without duplicate prompts.
 - A simulated authenticated Linux server with folders that do not exist on the bridge PC, including browsing, session attachment, prompt execution, and recovery on Windows/Linux CI.
 - Server-specific POSIX/Windows path handling, default/custom Basic authentication usernames, SSE authentication, and reverse-proxy URL prefixes.
+- Connected-provider model discovery, pagination, variant validation, selection per chat, snapshotting for pending prompts, and resuming an attached session's model/variant.
 - On Windows, PNG → `capture.ps1` round trips with noise and gamma changes. This test explicitly skips on Linux; the addon pixel encoder still runs there.
 
 CI runs on both Windows and Ubuntu.
@@ -37,12 +38,13 @@ Set `OPENCODE_SERVER_URL` if it is not at `http://127.0.0.1:4096`, plus `OPENCOD
 | `addon/WoWClaude/` | Game UI and transport; legacy internal names from upstream |
 | `bridge/opencode.js` | OpenCode HTTP/SSE client and stream reconciliation |
 | `bridge/workspace.js` | Server-side path semantics and remote directory browsing |
+| `bridge/models.js` | Connected providers, model pagination and reasoning variants |
 | `bridge/bridge.js` | I/O, jobs, controls, persistence, capture and slot publication |
 | `bridge/protocol.js` | Pure parsing and Lua serialization |
 | `bridge/capture.ps1` | Windows pixel decoder |
 | `setup.js`, `bridge/install-slots.js` | Installation and pre-created slots/signals |
 | `tests/` | Automated verification |
 
-After addon changes, run `node setup.js --wow "<client>"` to copy files. Restart the game fully when adding addon files. Do not commit `bridge/config.json`, authentication, logs, session state or transcripts.
+After addon changes, run `node setup.js --wow "<client>"` to copy files. **This release adds `ModelPicker.lua`; fully restart the game** to discover the new file. Do not commit `bridge/config.json`, authentication, logs, session state or transcripts.
 
 Keep the MIT license and upstream attribution. The original screenshot is retained as an upstream artifact, not as a screenshot of OpenCode in game.
