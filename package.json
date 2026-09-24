@@ -1,0 +1,35 @@
+{
+  "name": "wow-opencode",
+  "version": "0.4.0",
+  "private": true,
+  "description": "OpenCode client for World of Warcraft Forever: folders, persistent sessions, live chat and in-game notifications.",
+  "license": "MIT",
+  "author": "chelinho139",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicodlz/wow-opencode"
+  },
+  "keywords": [
+    "world-of-warcraft",
+    "wow-addon",
+    "opencode",
+    "bridge"
+  ],
+  "engines": {
+    "node": ">=22.2"
+  },
+  "bin": {
+    "wow-opencode": "bridge/supervisor.js"
+  },
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "node bridge/supervisor.js",
+    "slots": "node bridge/install-slots.js",
+    "test": "node tests/order_check.js && node --test tests/bridge_test.js tests/restore_test.js tests/addon_test.js tests/opencode_test.js tests/integration_test.js && node tests/codec_test.js",
+    "test:live": "node tests/live_opencode.js"
+  },
+  "devDependencies": {
+    "fengari": "^0.1.4",
+    "luaparse": "^0.3.1"
+  }
+}

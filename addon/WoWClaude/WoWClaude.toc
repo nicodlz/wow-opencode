@@ -1,0 +1,11 @@
+## Interface: 16001
+## Title: WoW OpenCode
+## Notes: Open folders and chat with OpenCode sessions in WoW Forever. Requires the companion bridge.
+## Author: wow-opencode contributors; based on chelinho139/wow-claude
+## Version: 0.4.0
+## SavedVariables: WoWClaudeDB
+
+Codec.lua
+Inbox.lua
+WoWClaude.lua
+Workspaces.lua

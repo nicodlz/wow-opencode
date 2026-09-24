@@ -1,0 +1,45 @@
+# Development
+
+Requires Node.js 22.2+. Runtime code uses Node's built-in modules; `fengari` and `luaparse` are development dependencies for running and validating the real addon Lua.
+
+```sh
+npm ci
+npm test
+```
+
+Tests cover:
+
+- Lua 5.1 syntax and declaration ordering, including the workspace browser.
+- The real addon in a WoW API stub: login, connection, pixels, folders, sessions, permissions, questions, cancellation, notifications and recovery.
+- Protocol parsing, folder semantics, escaping, deduplication and restoration.
+- HTTP/SSE streaming, dropped-event reconciliation, isolation between sessions and provider errors.
+- The real bridge process with a simulated OpenCode server, filesystem, permission/question responses and restart recovery without duplicate prompts.
+- On Windows, PNG → `capture.ps1` round trips with noise and gamma changes. This test explicitly skips on Linux; the addon pixel encoder still runs there.
+
+CI runs on both Windows and Ubuntu.
+
+## Real OpenCode smoke test
+
+With `opencode serve` running:
+
+```sh
+npm run test:live
+```
+
+Set `OPENCODE_SERVER_URL` if it is not at `http://127.0.0.1:4096`. The test creates a temporary session, stores a `noReply` message, checks history and SSE, then deletes the session. It does not request model inference. On Linux, `npm exec --package=opencode-ai -- node tests/live_opencode.js --spawn` can launch a temporary server on port 14096.
+
+## Layout
+
+| Path | Responsibility |
+|---|---|
+| `addon/WoWClaude/` | Game UI and transport; legacy internal names from upstream |
+| `bridge/opencode.js` | OpenCode HTTP/SSE client and stream reconciliation |
+| `bridge/bridge.js` | I/O, jobs, controls, persistence, capture and slot publication |
+| `bridge/protocol.js` | Pure parsing and Lua serialization |
+| `bridge/capture.ps1` | Windows pixel decoder |
+| `setup.js`, `bridge/install-slots.js` | Installation and pre-created slots/signals |
+| `tests/` | Automated verification |
+
+After addon changes, run `node setup.js --wow "<client>"` to copy files. Restart the game fully when adding addon files. Do not commit `bridge/config.json`, authentication, logs, session state or transcripts.
+
+Keep the MIT license and upstream attribution. The original screenshot is retained as an upstream artifact, not as a screenshot of OpenCode in game.
