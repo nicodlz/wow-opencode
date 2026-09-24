@@ -111,6 +111,16 @@ test('folder browser sends a control, receives paginated folders and opens a per
   vm.run('STUB.now = STUB.now + 4; STUB.Tick()');
   assert.equal(vm.evaluate('WoWOpenCodeBrowser.rows[1].item.name'), 'project 0');
   assert.equal(vm.evaluate('WoWOpenCodeBrowser.rows[10].shown'), 'true');
+  vm.run(`
+    GameTooltip.SetText = function(self, ...)
+      assert(select("#", ...) == 1, "SetText must receive only the sanitized text, not gsub's replacement count")
+      STUB.tooltipText = ...
+    end
+    local row = WoWOpenCodeBrowser.rows[1]
+    row.item.name = "project | name"
+    row.scripts.OnEnter(row)
+  `);
+  assert.equal(vm.evaluate('STUB.tooltipText'), 'project ¦ name');
   vm.run('WoWOpenCodeBrowser.open.scripts.OnClick()');
   const open = stripRecords(vm).find(r => r.flags === 'op=open');
   assert.equal(open.text, 'C:/work');

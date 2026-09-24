@@ -3,7 +3,7 @@ local OC = WoWOpenCode
 local browser
 local PAGE_SIZE = 10
 
-local function Safe(text) return tostring(text or ""):gsub("|", "¦") end
+local function Safe(text) return (tostring(text or ""):gsub("|", "¦")) end
 
 local function Button(parent, text, width, click)
 	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
